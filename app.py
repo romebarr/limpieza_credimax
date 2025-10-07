@@ -229,15 +229,15 @@ with col_r3:
 st.divider()
 st.subheader("📦 Descargas")
 
-# Export 1: Base limpia final (Excel)
+# ✅ Archivo principal: Base Credimax LIMPIA FINAL CON SEGMENTO
 st.download_button(
-    "⬇️ Base Credimax LIMPIA FINAL.xlsx",
+    "⬇️ Base Credimax LIMPIA FINAL CON SEGMENTO.xlsx",
     data=df_to_excel_bytes(df, sheet_name="base"),
-    file_name="Base Credimax LIMPIA FINAL.xlsx",
+    file_name="Base Credimax LIMPIA FINAL CON SEGMENTO.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
 
-# Export 2: Comparación Campaña Growth
+# Archivo comparativo opcional
 cmp_cols = [
     "SEGMENTO","Producto","Ind_Perfil_Campaña","CANAL","TESTEO CUOTA",
     "Campaña Growth Original","Campaña Growth",
@@ -250,73 +250,3 @@ st.download_button(
     file_name="Base Credimax COMPARACION CAMPANA GROWTH.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
-
-# Export 3: ZIP por campaña (manteniendo filas sin celular y encabezados)
-if export_por_campana:
-    col_campana = "Campaña Growth"
-    for col in [col_campana, "IND_DESEMBOLSO", "CELULAR"]:
-        if col not in df.columns:
-            df[col] = np.nan
-
-    df_exp = df[df['IND_DESEMBOLSO'] == '0'].copy()
-
-    df_exp[col_campana] = df_exp[col_campana].astype(str).str.strip()
-    mask_no_vacio = df_exp[col_campana].notna() & (df_exp[col_campana].str.len() > 0) & (df_exp[col_campana].str.lower() != 'nan')
-    df_exp = df_exp[mask_no_vacio].copy()
-
-    mapeo_columnas = {
-        'primer_nombre': 'nombre',
-        'CORREO CLIENTE': 'correo',
-        'CUPO': 'monto_credito_aprob',
-        'CUOTA': 'cuota_credimax',
-        'Tasa': 'Tasa_Credito_Aprob',
-        'CUPO_TARJETA_BK': 'Cupo_Aprobado_OB_BK',
-        'MARCA_TARJETA_BK': 'Marca_BK_OB'
-    }
-
-    for col in list(mapeo_columnas.keys()) + [col_campana, "IND_DESEMBOLSO", "CELULAR"]:
-        if col not in df_exp.columns:
-            df_exp[col] = np.nan
-
-    df_exp["CUOTA"] = df_exp["CUOTA"].apply(formatear_cuota)
-
-    columnas_originales = list(mapeo_columnas.keys()) + [col_campana, "CELULAR"]
-    df_exp = df_exp[columnas_originales].copy()
-    df_exp = df_exp.rename(columns=mapeo_columnas)
-
-    def cel_10(s):
-        if pd.isna(s):
-            return np.nan
-        dig = re.sub(r"\D+", "", str(s))
-        return dig if len(dig) == 10 else s
-
-    df_exp["CELULAR"] = df_exp["CELULAR"].apply(cel_10)
-
-    fecha_archivo = datetime.now().strftime("%d-%m")
-    zip_buf = io.BytesIO()
-
-    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for nombre, grupo in df_exp.groupby(col_campana, dropna=False):
-            if pd.isna(nombre):
-                continue
-            nombre_archivo = safe_filename(nombre)
-            if not nombre_archivo or nombre_archivo.lower() == 'nan':
-                continue
-
-            grupo_salida = grupo.drop(columns=[col_campana]).copy()
-            cols = ["CELULAR"] + [c for c in grupo_salida.columns if c != "CELULAR"]
-            grupo_salida = grupo_salida[cols]
-
-            excel_bytes = df_to_excel_bytes(grupo_salida, sheet_name="base")
-            zf.writestr(f"{nombre_archivo}_{fecha_archivo}.xlsx", excel_bytes)
-
-    zip_buf.seek(0)
-
-    st.download_button(
-        "⬇️ Descargar ZIP por campaña",
-        data=zip_buf,
-        file_name=f"archivos_por_campana_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
-        mime="application/zip",
-    )
-
-st.success("✅ Listo. Descarga tus archivos.")
