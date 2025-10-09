@@ -161,8 +161,22 @@ df["primer_apellido"] = df["primer_apellido"].apply(a_nombre_propio)
 df["CUPO"] = df["CUPO"].apply(cupo_a_texto_miles_coma)
 df["CUPO_TARJETA_BK"] = df["CUPO_TARJETA_BK"].apply(cupo_a_texto_miles_coma)
 
-# MARCA_TARJETA_BK: si no está en válidas por defecto, la dejamos tal cual (no pedimos mapa ni subida)
-# (Si quisieras, aquí podríamos forzar a NaN cuando no esté en lista válida)
+# MARCA_TARJETA_BK: forzar a NaN cuando no esté en lista válida (comparación normalizada)
+valid_norms = {norm(x) for x in MARCAS_VALIDAS_DEFAULT}
+marca_norm = df["MARCA_TARJETA_BK"].apply(lambda x: norm(x) if pd.notna(x) else x)
+mask_invalid_marcas = df["MARCA_TARJETA_BK"].notna() & (~marca_norm.isin(valid_norms))
+invalid_ejemplos = (
+    df.loc[mask_invalid_marcas, "MARCA_TARJETA_BK"].dropna().astype(str).str.strip().value_counts().head(10)
+)
+if mask_invalid_marcas.any():
+    df.loc[mask_invalid_marcas, "MARCA_TARJETA_BK"] = np.nan
+    st.warning(
+        f"Se detectaron **{int(mask_invalid_marcas.sum())}** marcas de tarjeta no válidas. "
+        "Fueron limpiadas a vacío (NaN). Revisa las tarjetas en el origen.")
+    if len(invalid_ejemplos):
+        st.caption("Ejemplos más frecuentes no válidos:")
+        st.write(invalid_ejemplos)
+
 
 # 2) Reglas determinísticas Campaña Growth
 for col in ["Campaña Growth", "CANAL", "Producto", "SEGMENTO", "TESTEO CUOTA"]:
@@ -250,6 +264,78 @@ st.download_button(
     file_name="Base Credimax COMPARACION CAMPANA GROWTH.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
+
+# ZIP por campaña (según toggle)
+if export_por_campana:
+    col_campana = "Campaña Growth"
+    for col in [col_campana, "IND_DESEMBOLSO", "CELULAR"]:
+        if col not in df.columns:
+            df[col] = np.nan
+
+    # Filtrar IND_DESEMBOLSO == '0'
+    df_exp = df[df['IND_DESEMBOLSO'] == '0'].copy()
+
+    # Trim campaña y quitar vacíos
+    df_exp[col_campana] = df_exp[col_campana].astype(str).str.strip()
+    mask_no_vacio = df_exp[col_campana].notna() & (df_exp[col_campana].str.len() > 0) & (df_exp[col_campana].str.lower() != 'nan')
+    df_exp = df_exp[mask_no_vacio].copy()
+
+    # Mapeo columnas de salida
+    mapeo_columnas = {
+        'primer_nombre': 'nombre',
+        'CORREO CLIENTE': 'correo',
+        'CUPO': 'monto_credito_aprob',
+        'CUOTA': 'cuota_credimax',
+        'Tasa': 'Tasa_Credito_Aprob',
+        'CUPO_TARJETA_BK': 'Cupo_Aprobado_OB_BK',
+        'MARCA_TARJETA_BK': 'Marca_BK_OB'
+    }
+
+    for col in list(mapeo_columnas.keys()) + [col_campana, "IND_DESEMBOLSO", "CELULAR"]:
+        if col not in df_exp.columns:
+            df_exp[col] = np.nan
+
+    # Formateo cuota a 2 decimales
+    df_exp["CUOTA"] = df_exp["CUOTA"].apply(formatear_cuota)
+
+    columnas_originales = list(mapeo_columnas.keys()) + [col_campana, "CELULAR"]
+    df_exp = df_exp[columnas_originales].copy()
+    df_exp = df_exp.rename(columns=mapeo_columnas)
+
+    # Normalizar celulares (no eliminar vacíos)
+    def cel_10(s):
+        if pd.isna(s):
+            return np.nan
+        dig = re.sub(r"[^0-9]", "", str(s))
+        return dig if len(dig) == 10 else s
+
+    df_exp["CELULAR"] = df_exp["CELULAR"].apply(cel_10)
+
+    # Construir ZIP en memoria
+    fecha_archivo = datetime.now().strftime("%d-%m")
+    zip_buf = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for nombre, grupo in df_exp.groupby(col_campana, dropna=False):
+            if pd.isna(nombre):
+                continue
+            nombre_archivo = safe_filename(nombre)
+            if not nombre_archivo or nombre_archivo.lower() == 'nan':
+                continue
+            grupo_salida = grupo.drop(columns=[col_campana]).copy()
+            cols = ["CELULAR"] + [c for c in grupo_salida.columns if c != "CELULAR"]
+            grupo_salida = grupo_salida[cols]
+            excel_bytes = df_to_excel_bytes(grupo_salida, sheet_name="base")
+            zf.writestr(f"{nombre_archivo}_{fecha_archivo}.xlsx", excel_bytes)
+
+    zip_buf.seek(0)
+
+    st.download_button(
+        "⬇️ Descargar ZIP por campaña",
+        data=zip_buf,
+        file_name=f"Campanas_segmentadas_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+        mime="application/zip",
+    )
 
 # Export 3: ZIP por campaña (manteniendo filas sin celular y encabezados)
 if export_por_campana:
