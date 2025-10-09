@@ -1,0 +1,3 @@
+# Archivos sensibles de exclusiones (Excel, etc.) no se versionan.
+*
+!.gitignore
