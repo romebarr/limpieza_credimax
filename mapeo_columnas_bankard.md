@@ -4,13 +4,15 @@
 
 Los archivos de Bankard ahora exportan **únicamente 5 columnas** con nombres específicos:
 
-| Columna Original | Columna Exportada | Descripción |
-|------------------|-------------------|-------------|
-| `primer_nombre` | `primer_nombre_bankard` | Nombre del cliente |
-| `cupo` | `Cupo_Aprobado_OB_BK` | Cupo aprobado (formateado con comas) |
-| `BIN` | `Marca_BK_OB` | Marca de la tarjeta |
-| `correo` | `correo` | Correo electrónico |
-| `telefono` | `telefono` | Número de teléfono |
+| Columna Original | Columna Exportada | Descripción | Tipo de Archivo |
+|------------------|-------------------|-------------|-----------------|
+| `primer_nombre` | `primer_nombre_bankard` | Nombre del cliente | Clientes |
+| `Nombres` | `primer_nombre_bankard` | Nombre del cliente | No Clientes |
+| `cupo` | `Cupo_Aprobado_OB_BK` | Cupo aprobado (formateado con comas) | Ambos |
+| `BIN` | `Marca_BK_OB` | Marca de la tarjeta | Ambos |
+| `correo` | `correo` | Correo electrónico | Clientes |
+| `CORREO BANCO ` | `correo` | Correo electrónico | No Clientes |
+| `telefono` | `telefono` | Número de teléfono | Ambos |
 
 ## 📁 Archivos de Descarga
 
@@ -36,11 +38,14 @@ Los archivos de Bankard ahora exportan **únicamente 5 columnas** con nombres es
 ### 🧹 Limpiezas Aplicadas
 
 - **Nombres**: Formato de nombres propios (ej: "juan perez" → "Juan Perez")
+  - `primer_nombre` (archivos Clientes)
+  - `Nombres` (archivos No Clientes)
 - **Cupos**: Formato con separadores de miles (ej: 1000 → "1,000")
 - **Teléfonos/Cédulas**: Normalizados a 10 dígitos
 - **BINs**: Corregidos automáticamente con sistema inteligente
 - **Exclusiones**: Aplicadas desde sistema consolidado (5,776 cédulas)
 - **TIPO**: Si no existe columna TIPO, se asigna automáticamente "No Clientes"
+- **Mapeo inteligente**: Detecta automáticamente columnas de Clientes vs No Clientes
 
 ## ✅ Ventajas
 

@@ -13,23 +13,28 @@ Cuando subes un archivo de Bankard **No Clientes** que no tiene la columna `TIPO
 
 ### **Antes del Procesamiento:**
 ```
-Archivo Excel subido:
-├── primer_nombre
+Archivo Excel No Clientes subido:
+├── Nombres
 ├── cupo
 ├── BIN
-├── correo
+├── CORREO BANCO 
 └── telefono
 ```
 
 ### **Después del Procesamiento:**
 ```
 DataFrame procesado:
-├── primer_nombre
+├── Nombres (limpiado a formato nombres propios)
 ├── cupo
 ├── BIN
-├── correo
+├── CORREO BANCO 
 ├── telefono
 └── TIPO  ← Creada automáticamente con valor "No Clientes"
+
+Mapeo aplicado:
+├── Nombres → primer_nombre_bankard
+├── CORREO BANCO  → correo
+└── Resto de columnas mapeadas según especificación
 ```
 
 ## 📁 Archivos Generados

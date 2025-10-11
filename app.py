@@ -554,9 +554,13 @@ def limpiar_nombres_bankard(df):
     """Limpia y normaliza nombres en formato de nombres propios para Bankard"""
     df = df.copy()
     
-    # Limpiar primer_nombre si existe
+    # Limpiar primer_nombre si existe (archivos de clientes)
     if "primer_nombre" in df.columns:
         df["primer_nombre"] = df["primer_nombre"].apply(a_nombre_propio)
+    
+    # Limpiar Nombres si existe (archivos No Clientes)
+    if "Nombres" in df.columns:
+        df["Nombres"] = df["Nombres"].apply(a_nombre_propio)
     
     # Limpiar nombre si existe (columna alternativa)
     if "nombre" in df.columns:
@@ -739,12 +743,14 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
     if col_tipo not in df.columns or col_exclusion not in df.columns:
         return None, []
 
-    # Mapeo de columnas para Bankard
+    # Mapeo de columnas para Bankard (incluye variantes para No Clientes)
     mapeo_columnas_bankard = {
         "primer_nombre": "primer_nombre_bankard",
+        "Nombres": "primer_nombre_bankard",  # Para archivos No Clientes
         "cupo": "Cupo_Aprobado_OB_BK", 
         "BIN": "Marca_BK_OB",
         "correo": "correo",
+        "CORREO BANCO ": "correo",  # Para archivos No Clientes
         "telefono": "telefono"
     }
 
@@ -1226,12 +1232,14 @@ def run_bankard():
     st.divider()
     st.subheader("📦 Descargas")
 
-    # Aplicar mapeo de columnas para el archivo principal
+    # Aplicar mapeo de columnas para el archivo principal (incluye variantes para No Clientes)
     mapeo_columnas_bankard = {
         "primer_nombre": "primer_nombre_bankard",
+        "Nombres": "primer_nombre_bankard",  # Para archivos No Clientes
         "cupo": "Cupo_Aprobado_OB_BK", 
         "BIN": "Marca_BK_OB",
         "correo": "correo",
+        "CORREO BANCO ": "correo",  # Para archivos No Clientes
         "telefono": "telefono"
     }
     
