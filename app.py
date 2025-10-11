@@ -76,6 +76,7 @@ VALORES_BIN_PERMITIDOS = [
 ]
 
 MEMORIA_CORRECCIONES_PATH = Path("memoria_correcciones_bin.json")
+MEMORIA_ESTADISTICAS_PATH = Path("memoria_estadisticas_bin.json")
 EXCLUSIONES_BANKARD_DIR = Path("data/exclusiones_bankard")
 EXCLUSIONES_BANKARD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -281,6 +282,7 @@ def preparar_zip_por_campana(df: pd.DataFrame, col_campana: str = "Campaña Grow
 # Funciones específicas Bankard
 # =============================
 def cargar_memoria_correcciones():
+    """Carga las correcciones manuales de BINs"""
     if MEMORIA_CORRECCIONES_PATH.exists():
         try:
             return json.loads(MEMORIA_CORRECCIONES_PATH.read_text(encoding="utf-8"))
@@ -289,10 +291,170 @@ def cargar_memoria_correcciones():
     return {}
 
 
+def cargar_estadisticas_bin():
+    """Carga estadísticas de uso y patrones de BINs"""
+    if MEMORIA_ESTADISTICAS_PATH.exists():
+        try:
+            return json.loads(MEMORIA_ESTADISTICAS_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {
+                "frecuencias": {},
+                "sugerencias": {},
+                "patrones": {},
+                "ultima_actualizacion": None
+            }
+    return {
+        "frecuencias": {},
+        "sugerencias": {},
+        "patrones": {},
+        "ultima_actualizacion": None
+    }
+
+
 def guardar_memoria_correcciones(memoria):
+    """Guarda las correcciones manuales de BINs"""
     MEMORIA_CORRECCIONES_PATH.write_text(
         json.dumps(memoria, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+
+
+def guardar_estadisticas_bin(estadisticas):
+    """Guarda las estadísticas de uso de BINs"""
+    estadisticas["ultima_actualizacion"] = datetime.now().isoformat()
+    MEMORIA_ESTADISTICAS_PATH.write_text(
+        json.dumps(estadisticas, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def calcular_similitud_bin(bin_original, bin_candidato):
+    """Calcula similitud entre dos BINs usando distancia de Levenshtein normalizada"""
+    if not bin_original or not bin_candidato:
+        return 0.0
+    
+    s1, s2 = str(bin_original).lower().strip(), str(bin_candidato).lower().strip()
+    if s1 == s2:
+        return 1.0
+    
+    # Distancia de Levenshtein simple
+    def levenshtein_distance(s1, s2):
+        if len(s1) < len(s2):
+            return levenshtein_distance(s2, s1)
+        if len(s2) == 0:
+            return len(s1)
+        
+        previous_row = list(range(len(s2) + 1))
+        for i, c1 in enumerate(s1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(min(insertions, deletions, substitutions))
+            previous_row = current_row
+        
+        return previous_row[-1]
+    
+    distance = levenshtein_distance(s1, s2)
+    max_len = max(len(s1), len(s2))
+    return 1.0 - (distance / max_len) if max_len > 0 else 0.0
+
+
+def generar_sugerencias_inteligentes(bin_problema, memoria_correcciones, estadisticas):
+    """Genera sugerencias inteligentes para un BIN problemático"""
+    sugerencias = []
+    
+    # 1. Buscar en correcciones manuales existentes
+    if bin_problema in memoria_correcciones:
+        return [memoria_correcciones[bin_problema]]
+    
+    # 2. Buscar por similitud en BINs válidos
+    similitudes = []
+    for bin_valido in VALORES_BIN_PERMITIDOS:
+        similitud = calcular_similitud_bin(bin_problema, bin_valido)
+        if similitud > 0.3:  # Umbral mínimo de similitud
+            similitudes.append((bin_valido, similitud))
+    
+    # Ordenar por similitud descendente
+    similitudes.sort(key=lambda x: x[1], reverse=True)
+    sugerencias.extend([bin_valido for bin_valido, _ in similitudes[:3]])
+    
+    # 3. Buscar en patrones históricos
+    if bin_problema in estadisticas.get("patrones", {}):
+        patrones = estadisticas["patrones"][bin_problema]
+        # Ordenar por frecuencia de uso
+        patrones_ordenados = sorted(patrones.items(), key=lambda x: x[1], reverse=True)
+        sugerencias.extend([patron for patron, _ in patrones_ordenados[:2]])
+    
+    # 4. Buscar sugerencias previamente generadas
+    if bin_problema in estadisticas.get("sugerencias", {}):
+        sugerencias_previas = estadisticas["sugerencias"][bin_problema]
+        sugerencias.extend(sugerencias_previas[:2])
+    
+    # Eliminar duplicados manteniendo orden
+    sugerencias_unicas = []
+    for sug in sugerencias:
+        if sug not in sugerencias_unicas:
+            sugerencias_unicas.append(sug)
+    
+    return sugerencias_unicas[:5]  # Máximo 5 sugerencias
+
+
+def actualizar_estadisticas_bin(bin_original, bin_corregido, estadisticas):
+    """Actualiza las estadísticas cuando se usa una corrección"""
+    if not bin_original or not bin_corregido:
+        return
+    
+    bin_orig = str(bin_original).strip()
+    bin_corr = str(bin_corregido).strip()
+    
+    # Actualizar frecuencias
+    if "frecuencias" not in estadisticas:
+        estadisticas["frecuencias"] = {}
+    
+    if bin_orig not in estadisticas["frecuencias"]:
+        estadisticas["frecuencias"][bin_orig] = {}
+    
+    if bin_corr not in estadisticas["frecuencias"][bin_orig]:
+        estadisticas["frecuencias"][bin_orig][bin_corr] = 0
+    
+    estadisticas["frecuencias"][bin_orig][bin_corr] += 1
+    
+    # Actualizar patrones (más generales)
+    if "patrones" not in estadisticas:
+        estadisticas["patrones"] = {}
+    
+    if bin_orig not in estadisticas["patrones"]:
+        estadisticas["patrones"][bin_orig] = {}
+    
+    if bin_corr not in estadisticas["patrones"][bin_orig]:
+        estadisticas["patrones"][bin_orig][bin_corr] = 0
+    
+    estadisticas["patrones"][bin_orig][bin_corr] += 1
+
+
+def detectar_bins_no_permitidos_inteligente(df, memoria_correcciones, estadisticas):
+    """Detecta BINs no permitidos y genera sugerencias automáticas"""
+    if "BIN" not in df.columns:
+        return [], {}
+    
+    valores_actuales = {
+        str(x).strip() for x in df["BIN"].dropna().unique().tolist()
+    }
+    permitidos = set(VALORES_BIN_PERMITIDOS)
+    memorizados = set(memoria_correcciones.keys())
+    
+    bins_problematicos = []
+    sugerencias_automaticas = {}
+    
+    for valor in valores_actuales:
+        if valor not in permitidos and valor not in memorizados:
+            bins_problematicos.append(valor)
+            # Generar sugerencias automáticas
+            sugerencias = generar_sugerencias_inteligentes(valor, memoria_correcciones, estadisticas)
+            if sugerencias:
+                sugerencias_automaticas[valor] = sugerencias
+    
+    return bins_problematicos, sugerencias_automaticas
 
 
 def limpiar_cupo_bankard(df):
@@ -313,18 +475,10 @@ def limpiar_cupo_bankard(df):
     return df
 
 
-def detectar_bins_no_permitidos(df, memoria):
-    if "BIN" not in df.columns:
-        return []
-    valores_actuales = {
-        str(x).strip() for x in df["BIN"].dropna().unique().tolist()
-    }
-    permitidos = set(VALORES_BIN_PERMITIDOS)
-    memorizados = set(memoria.keys())
-    return sorted(v for v in valores_actuales if v not in permitidos and v not in memorizados)
 
 
-def aplicar_correcciones_bin(df, memoria):
+def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None):
+    """Aplica correcciones de BIN con actualización de estadísticas"""
     df = df.copy()
     if "BIN" not in df.columns:
         df["BIN"] = np.nan
@@ -334,10 +488,31 @@ def aplicar_correcciones_bin(df, memoria):
         if pd.isna(valor):
             return valor
         val = str(valor).strip()
-        if val in memoria and memoria[val]:
-            return memoria[val]
+        
+        # Si ya está en memoria de correcciones, usarlo
+        if val in memoria_correcciones and memoria_correcciones[val]:
+            correccion = memoria_correcciones[val]
+            # Actualizar estadísticas si están disponibles
+            if estadisticas is not None:
+                actualizar_estadisticas_bin(val, correccion, estadisticas)
+            return correccion
+        
+        # Si ya es válido, mantenerlo
         if val in VALORES_BIN_PERMITIDOS:
             return val
+        
+        # Si no es válido, intentar sugerencias automáticas
+        if estadisticas is not None:
+            sugerencias = generar_sugerencias_inteligentes(val, memoria_correcciones, estadisticas)
+            if sugerencias:
+                # Usar la primera sugerencia automáticamente si tiene alta confianza
+                primera_sugerencia = sugerencias[0]
+                # Solo auto-aplicar si la similitud es muy alta (>0.8)
+                similitud = calcular_similitud_bin(val, primera_sugerencia)
+                if similitud > 0.8:
+                    actualizar_estadisticas_bin(val, primera_sugerencia, estadisticas)
+                    return primera_sugerencia
+        
         return val.title()
 
     df["BIN"] = df["BIN"].apply(corregir)
@@ -707,8 +882,11 @@ def run_bankard():
         return
 
     df = limpiar_cupo_bankard(df)
-    memoria = cargar_memoria_correcciones()
-    pendientes = detectar_bins_no_permitidos(df, memoria)
+    memoria_correcciones = cargar_memoria_correcciones()
+    estadisticas = cargar_estadisticas_bin()
+    
+    # Detectar BINs problemáticos con sugerencias automáticas
+    pendientes, sugerencias_auto = detectar_bins_no_permitidos_inteligente(df, memoria_correcciones, estadisticas)
 
     if pendientes:
         st.warning(
@@ -717,31 +895,56 @@ def run_bankard():
         st.caption(
             "Opciones permitidas: " + ", ".join(VALORES_BIN_PERMITIDOS)
         )
+        
+        # Mostrar estadísticas de uso si están disponibles
+        if estadisticas.get("ultima_actualizacion"):
+            st.caption(f"💡 Sistema de aprendizaje activo (última actualización: {estadisticas['ultima_actualizacion'][:10]})")
+        
         correcciones_inputs = {}
         with st.form("correcciones_bin"):
             st.write("Indica cómo reemplazar cada BIN detectado (dejar vacío para ignorar).")
+            
             for valor in pendientes:
+                # Mostrar sugerencias automáticas si están disponibles
+                sugerencias = sugerencias_auto.get(valor, [])
+                if sugerencias:
+                    st.write(f"**'{valor}'** - Sugerencias automáticas:")
+                    for i, sug in enumerate(sugerencias[:3], 1):
+                        st.caption(f"  {i}. {sug}")
+                
+                # Input con valor por defecto de la primera sugerencia
+                valor_default = sugerencias[0] if sugerencias else memoria_correcciones.get(valor, "")
                 correcciones_inputs[valor] = st.text_input(
                     f"Nuevo valor para '{valor}'",
-                    value=memoria.get(valor, ""),
+                    value=valor_default,
                     key=f"bin_corr_{valor}",
+                    help=f"Sugerencias: {', '.join(sugerencias[:3])}" if sugerencias else None
                 )
+            
             submitted = st.form_submit_button("Guardar correcciones")
+        
         if submitted:
-            actualizaciones = {
-                origen: nuevo.strip()
-                for origen, nuevo in correcciones_inputs.items()
-                if nuevo.strip()
-            }
+            actualizaciones = {}
+            for origen, nuevo in correcciones_inputs.items():
+                if nuevo.strip():
+                    actualizaciones[origen] = nuevo.strip()
+                    # Actualizar estadísticas inmediatamente
+                    actualizar_estadisticas_bin(origen, nuevo.strip(), estadisticas)
+            
             if actualizaciones:
-                memoria.update(actualizaciones)
-                guardar_memoria_correcciones(memoria)
-                st.success("Correcciones guardadas. Se aplicarán inmediatamente.")
+                memoria_correcciones.update(actualizaciones)
+                guardar_memoria_correcciones(memoria_correcciones)
+                guardar_estadisticas_bin(estadisticas)
+                st.success("Correcciones guardadas y estadísticas actualizadas. Se aplicarán inmediatamente.")
             else:
                 st.info("No se ingresaron correcciones nuevas.")
-            memoria = cargar_memoria_correcciones()
+            
+            # Recargar datos actualizados
+            memoria_correcciones = cargar_memoria_correcciones()
+            estadisticas = cargar_estadisticas_bin()
 
-    df = aplicar_correcciones_bin(df, memoria)
+    # Aplicar correcciones con el sistema inteligente
+    df = aplicar_correcciones_bin(df, memoria_correcciones, estadisticas)
     df, excluidos_vigencia = filtrar_vigencia_bankard(df)
     df = limpiar_telefonos_cedulas_bankard(df)
 
@@ -769,6 +972,49 @@ def run_bankard():
     col_b1.metric("Registros totales", total_registros)
     col_b2.metric("Exclusión = SI", excl_si)
     col_b3.metric("Exclusión = NO", excl_no)
+    
+    # Mostrar estadísticas del sistema de aprendizaje
+    if estadisticas.get("frecuencias") or estadisticas.get("patrones"):
+        st.divider()
+        st.subheader("🧠 Estadísticas del Sistema de Aprendizaje")
+        
+        col_stats1, col_stats2 = st.columns(2)
+        
+        with col_stats1:
+            if estadisticas.get("frecuencias"):
+                st.write("**Correcciones más frecuentes:**")
+                frecuencias_totales = {}
+                for bin_orig, correcciones in estadisticas["frecuencias"].items():
+                    for bin_corr, count in correcciones.items():
+                        key = f"{bin_orig} → {bin_corr}"
+                        frecuencias_totales[key] = count
+                
+                if frecuencias_totales:
+                    top_correcciones = sorted(frecuencias_totales.items(), key=lambda x: x[1], reverse=True)[:5]
+                    for correccion, count in top_correcciones:
+                        st.caption(f"• {correccion}: {count} veces")
+        
+        with col_stats2:
+            if estadisticas.get("patrones"):
+                st.write("**Patrones detectados:**")
+                total_patrones = sum(len(patrones) for patrones in estadisticas["patrones"].values())
+                st.metric("BINs con patrones", total_patrones)
+                
+                if estadisticas.get("ultima_actualizacion"):
+                    fecha_ultima = estadisticas["ultima_actualizacion"][:10]
+                    st.caption(f"Última actualización: {fecha_ultima}")
+        
+        # Botón para limpiar estadísticas (opcional)
+        if st.button("🗑️ Limpiar estadísticas", help="Elimina todas las estadísticas de aprendizaje"):
+            estadisticas = {
+                "frecuencias": {},
+                "sugerencias": {},
+                "patrones": {},
+                "ultima_actualizacion": None
+            }
+            guardar_estadisticas_bin(estadisticas)
+            st.success("Estadísticas limpiadas")
+            st.rerun()
 
     if excluidos_vigencia:
         st.info(
