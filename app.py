@@ -78,6 +78,7 @@ VALORES_BIN_PERMITIDOS = [
 MEMORIA_CORRECCIONES_PATH = Path("memoria_correcciones_bin.json")
 MEMORIA_ESTADISTICAS_PATH = Path("memoria_estadisticas_bin.json")
 EXCLUSIONES_BANKARD_DIR = Path("data/exclusiones_bankard")
+EXCLUSIONES_CONSOLIDADAS_PATH = Path("exclusiones_consolidadas.json")
 EXCLUSIONES_BANKARD_DIR.mkdir(parents=True, exist_ok=True)
 
 # =============================
@@ -549,6 +550,21 @@ def limpiar_telefonos_cedulas_bankard(df):
     return df
 
 
+def limpiar_nombres_bankard(df):
+    """Limpia y normaliza nombres en formato de nombres propios para Bankard"""
+    df = df.copy()
+    
+    # Limpiar primer_nombre si existe
+    if "primer_nombre" in df.columns:
+        df["primer_nombre"] = df["primer_nombre"].apply(a_nombre_propio)
+    
+    # Limpiar nombre si existe (columna alternativa)
+    if "nombre" in df.columns:
+        df["nombre"] = df["nombre"].apply(a_nombre_propio)
+    
+    return df
+
+
 def cargar_cedulas_excluir_uploads(files):
     cedulas = set()
     errores = []
@@ -569,7 +585,70 @@ def cargar_cedulas_excluir_uploads(files):
     return cedulas, errores
 
 
+def cargar_exclusiones_consolidadas():
+    """Carga el archivo JSON consolidado de exclusiones"""
+    if EXCLUSIONES_CONSOLIDADAS_PATH.exists():
+        try:
+            with open(EXCLUSIONES_CONSOLIDADAS_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return data.get("cedulas_excluidas", {}), data.get("estadisticas", {})
+        except (json.JSONDecodeError, KeyError):
+            return {}, {}
+    return {}, {}
+
+
+def guardar_exclusiones_consolidadas(cedulas_data, estadisticas):
+    """Guarda las exclusiones consolidadas en JSON"""
+    data = {
+        "cedulas_excluidas": cedulas_data,
+        "estadisticas": estadisticas
+    }
+    with open(EXCLUSIONES_CONSOLIDADAS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def procesar_archivo_exclusiones(archivo_path, cedulas_consolidadas, estadisticas):
+    """Procesa un archivo de exclusiones y actualiza la base consolidada"""
+    try:
+        df_exc = pd.read_excel(archivo_path, dtype=str)
+    except Exception as exc:
+        return False, f"Error leyendo archivo: {exc}"
+    
+    if "IDENTIFICACION" not in df_exc.columns:
+        return False, "No contiene columna 'IDENTIFICACION'"
+    
+    cedulas_nuevas = 0
+    cedulas_actualizadas = 0
+    fecha_actual = datetime.now().strftime("%Y-%m-%d")
+    
+    for cedula_raw in df_exc["IDENTIFICACION"].dropna():
+        cedula = pad_10_digitos(cedula_raw)
+        if not cedula:
+            continue
+            
+        if cedula not in cedulas_consolidadas:
+            cedulas_consolidadas[cedula] = {
+                "fecha_agregada": fecha_actual,
+                "fuente": archivo_path.name,
+                "activa": True
+            }
+            cedulas_nuevas += 1
+        else:
+            # Actualizar fecha si ya existe
+            cedulas_consolidadas[cedula]["fecha_agregada"] = fecha_actual
+            cedulas_consolidadas[cedula]["fuente"] = archivo_path.name
+            cedulas_actualizadas += 1
+    
+    # Actualizar estadísticas
+    estadisticas["total_cedulas"] = len(cedulas_consolidadas)
+    estadisticas["ultima_actualizacion"] = datetime.now().isoformat()
+    estadisticas["archivos_procesados"] = estadisticas.get("archivos_procesados", 0) + 1
+    
+    return True, f"Procesado: {cedulas_nuevas} nuevas, {cedulas_actualizadas} actualizadas"
+
+
 def cargar_cedulas_excluir_directorio(path: Path):
+    """Carga exclusiones desde archivos Excel (método legacy)"""
     cedulas = set()
     errores = []
     archivos = []
@@ -595,6 +674,32 @@ def cargar_cedulas_excluir_directorio(path: Path):
         archivos.append(archivo.name)
 
     return cedulas, errores, archivos
+
+
+def consolidar_exclusiones_desde_directorio():
+    """Consolida todos los archivos Excel en el JSON consolidado"""
+    cedulas_consolidadas, estadisticas = cargar_exclusiones_consolidadas()
+    archivos_procesados = 0
+    errores = []
+    
+    if not EXCLUSIONES_BANKARD_DIR.exists():
+        return False, "Directorio de exclusiones no existe"
+    
+    for archivo in EXCLUSIONES_BANKARD_DIR.glob("*.xlsx"):
+        if archivo.name.startswith("~$"):
+            continue
+            
+        success, message = procesar_archivo_exclusiones(archivo, cedulas_consolidadas, estadisticas)
+        if success:
+            archivos_procesados += 1
+        else:
+            errores.append(f"{archivo.name}: {message}")
+    
+    if archivos_procesados > 0:
+        guardar_exclusiones_consolidadas(cedulas_consolidadas, estadisticas)
+        return True, f"Consolidados {archivos_procesados} archivos. {len(errores)} errores."
+    
+    return False, f"No se procesaron archivos. {len(errores)} errores."
 
 
 def marcar_exclusiones_varios(df, cedulas_excluir):
@@ -634,10 +739,27 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
     if col_tipo not in df.columns or col_exclusion not in df.columns:
         return None, []
 
+    # Mapeo de columnas para Bankard
+    mapeo_columnas_bankard = {
+        "primer_nombre": "primer_nombre_bankard",
+        "cupo": "Cupo_Aprobado_OB_BK", 
+        "BIN": "Marca_BK_OB",
+        "correo": "correo",
+        "telefono": "telefono"
+    }
+
+    # Columnas finales que se exportarán
+    columnas_exportadas = [
+        "primer_nombre_bankard",
+        "Cupo_Aprobado_OB_BK",
+        "Marca_BK_OB", 
+        "correo",
+        "telefono"
+    ]
+
     hoy_str = datetime.now().strftime("%d%m")
     zip_buf = io.BytesIO()
     archivos = 0
-    columnas_exportadas = df.columns.tolist()
 
     with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         for tipo in sorted(df[col_tipo].dropna().astype(str).unique()):
@@ -648,13 +770,30 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
                 ].copy()
                 if subset.empty:
                     continue
-                if "cupo" in subset.columns:
-                    subset["cupo"] = subset["cupo"].apply(
-                        lambda x: f"{int(x):,}" if str(x).strip() != "" else ""
+                
+                # Aplicar mapeo de columnas
+                subset_mapeado = subset.copy()
+                for col_original, col_nueva in mapeo_columnas_bankard.items():
+                    if col_original in subset_mapeado.columns:
+                        subset_mapeado[col_nueva] = subset_mapeado[col_original]
+                
+                # Formatear cupo con comas
+                if "Cupo_Aprobado_OB_BK" in subset_mapeado.columns:
+                    subset_mapeado["Cupo_Aprobado_OB_BK"] = subset_mapeado["Cupo_Aprobado_OB_BK"].apply(
+                        lambda x: f"{int(x):,}" if str(x).strip() != "" and str(x).strip() != "nan" else ""
                     )
+                
+                # Seleccionar solo las columnas que se van a exportar
+                subset_final = subset_mapeado.reindex(columns=columnas_exportadas)
+                
+                # Asegurar que todas las columnas existan
+                for col in columnas_exportadas:
+                    if col not in subset_final.columns:
+                        subset_final[col] = ""
+                
                 nombre_tipo = safe_filename(tipo) or "SIN_TIPO"
                 nombre_archivo = f"{nombre_tipo}_{excl}_{hoy_str}.xlsx"
-                zf.writestr(nombre_archivo, df_to_excel_bytes(subset, sheet_name="base"))
+                zf.writestr(nombre_archivo, df_to_excel_bytes(subset_final, sheet_name="base"))
                 archivos += 1
 
     if archivos == 0:
@@ -837,39 +976,81 @@ def run_bankard():
         "Base Bankard (.xlsx)", type=["xlsx"], key="base_bankard"
     )
 
-    st.sidebar.header("2) Exclusiones (opcional)")
+    st.sidebar.header("2) Sistema de Exclusiones")
+    
+    # Cargar exclusiones consolidadas
+    cedulas_consolidadas, estadisticas_exclusiones = cargar_exclusiones_consolidadas()
+    
+    # Mostrar estadísticas del sistema consolidado
+    if estadisticas_exclusiones:
+        st.sidebar.success(f"📊 **Sistema Consolidado Activo**")
+        st.sidebar.metric("Cédulas en exclusión", estadisticas_exclusiones.get("total_cedulas", 0))
+        st.sidebar.caption(f"Última actualización: {estadisticas_exclusiones.get('ultima_actualizacion', 'N/A')[:10]}")
+        st.sidebar.caption(f"Archivos procesados: {estadisticas_exclusiones.get('archivos_procesados', 0)}")
+    else:
+        st.sidebar.info("📊 **Sistema Consolidado Vacío**")
+        st.sidebar.caption("Usa las opciones abajo para cargar exclusiones")
+    
+    # Opciones de carga de exclusiones
+    st.sidebar.subheader("🔄 Opciones de Carga")
+    
+    # Opción 1: Consolidar desde carpeta
+    if st.sidebar.button("📁 Consolidar desde carpeta", help="Procesa todos los Excel de data/exclusiones_bankard/"):
+        with st.spinner("Consolidando archivos Excel..."):
+            success, message = consolidar_exclusiones_desde_directorio()
+            if success:
+                st.sidebar.success(message)
+                st.rerun()
+            else:
+                st.sidebar.error(message)
+    
+    # Opción 2: Cargar archivos individuales
     exclusion_files = st.sidebar.file_uploader(
-        "Archivos de exclusión (.xlsx)",
+        "📤 Subir archivos de exclusión (.xlsx)",
         type=["xlsx"],
         accept_multiple_files=True,
         key="exclusiones_bankard",
+        help="Se procesarán y agregarán al sistema consolidado"
     )
-    st.sidebar.caption("Se utilizará la columna 'IDENTIFICACION' de cada archivo para excluir cédulas.")
-    st.sidebar.caption(
-        "También puedes dejar archivos .xlsx permanentes en "
-        f"`{EXCLUSIONES_BANKARD_DIR}` para cargarlos automáticamente."
-    )
-
+    
+    # Procesar archivos subidos
+    if exclusion_files:
+        with st.spinner("Procesando archivos subidos..."):
+            archivos_procesados = 0
+            for uploaded_file in exclusion_files:
+                # Crear archivo temporal
+                temp_path = EXCLUSIONES_BANKARD_DIR / uploaded_file.name
+                with open(temp_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                
+                # Procesar archivo
+                success, message = procesar_archivo_exclusiones(temp_path, cedulas_consolidadas, estadisticas_exclusiones)
+                if success:
+                    archivos_procesados += 1
+                    # Guardar cambios
+                    guardar_exclusiones_consolidadas(cedulas_consolidadas, estadisticas_exclusiones)
+                else:
+                    st.sidebar.warning(f"Error en {uploaded_file.name}: {message}")
+                
+                # Limpiar archivo temporal
+                temp_path.unlink()
+            
+            if archivos_procesados > 0:
+                st.sidebar.success(f"✅ Procesados {archivos_procesados} archivos")
+                st.rerun()
+    
+    # Opción 3: Método legacy (para compatibilidad)
+    st.sidebar.caption("---")
+    st.sidebar.caption("**Método Legacy (solo lectura):**")
     (
         cedulas_persistentes,
         errores_persistentes,
         archivos_persistentes,
     ) = cargar_cedulas_excluir_directorio(EXCLUSIONES_BANKARD_DIR)
-    if cedulas_persistentes:
-        st.sidebar.info(
-            f"{len(cedulas_persistentes)} cédulas serán excluidas desde la carpeta permanente."
-        )
+    
     if archivos_persistentes:
-        st.sidebar.caption("Archivos permanentes detectados:")
-        for nombre_archivo in sorted(archivos_persistentes):
-            st.sidebar.write(f"• {nombre_archivo}")
-    elif not errores_persistentes:
-        st.sidebar.caption(
-            "No hay archivos permanentes en `data/exclusiones_bankard` todavía."
-        )
-    if errores_persistentes:
-        for msg in errores_persistentes:
-            st.sidebar.warning(f"Exclusión local omitida: {msg}")
+        st.sidebar.caption(f"Archivos Excel detectados: {len(archivos_persistentes)}")
+        st.sidebar.caption("💡 Usa 'Consolidar desde carpeta' para procesarlos")
 
     if not base_file:
         st.info("👆 Sube la base para continuar.")
@@ -947,21 +1128,39 @@ def run_bankard():
     df = aplicar_correcciones_bin(df, memoria_correcciones, estadisticas)
     df, excluidos_vigencia = filtrar_vigencia_bankard(df)
     df = limpiar_telefonos_cedulas_bankard(df)
+    df = limpiar_nombres_bankard(df)
 
-    cedulas_excluir, errores_exclusiones = cargar_cedulas_excluir_uploads(exclusion_files)
+    # Usar el sistema consolidado como principal
+    cedulas_excluir = set(cedulas_consolidadas.keys())
+    
+    # Agregar exclusiones de uploads (método legacy para compatibilidad)
+    if exclusion_files:
+        cedulas_upload, errores_exclusiones = cargar_cedulas_excluir_uploads(exclusion_files)
+        cedulas_excluir.update(cedulas_upload)
+        if errores_exclusiones:
+            for msg in errores_exclusiones:
+                st.warning(f"Exclusión omitida: {msg}")
+    
+    # Agregar exclusiones persistentes (método legacy)
     if cedulas_persistentes:
         cedulas_excluir.update(cedulas_persistentes)
-    if errores_exclusiones:
-        for msg in errores_exclusiones:
-            st.warning(f"Exclusión omitida: {msg}")
+    
     total_exclusiones = len(cedulas_excluir)
     if total_exclusiones:
         st.caption(
-            "Se aplicaron **" + str(total_exclusiones) + "** cédulas de exclusión (uploads/permanentes)."
+            f"Se aplicaron **{total_exclusiones}** cédulas de exclusión "
+            f"({len(cedulas_consolidadas)} del sistema consolidado + {total_exclusiones - len(cedulas_consolidadas)} adicionales)."
         )
 
     df = marcar_exclusiones_varios(df, cedulas_excluir)
-    ensure_column_from(df, "TIPO ", sources=["TIPO"], fill_value="")
+    
+    # Verificar si existe columna TIPO antes de crearla
+    tiene_tipo = "TIPO " in df.columns or "TIPO" in df.columns
+    ensure_column_from(df, "TIPO ", sources=["TIPO"], fill_value="No Clientes")
+    
+    # Mostrar información si se creó la columna TIPO
+    if not tiene_tipo:
+        st.info("ℹ️ **Columna TIPO no encontrada** - Se asignó automáticamente 'No Clientes' a todos los registros")
 
     total_registros = len(df)
     excl_si = int((df["exclusion"].astype(str).str.upper() == "SI").sum())
@@ -972,6 +1171,9 @@ def run_bankard():
     col_b1.metric("Registros totales", total_registros)
     col_b2.metric("Exclusión = SI", excl_si)
     col_b3.metric("Exclusión = NO", excl_no)
+    
+    # Mostrar información de limpieza aplicada
+    st.caption("🧹 **Limpieza aplicada:** Nombres en formato propio, cupos con comas, teléfonos/cédulas normalizados, BINs corregidos")
     
     # Mostrar estadísticas del sistema de aprendizaje
     if estadisticas.get("frecuencias") or estadisticas.get("patrones"):
@@ -1024,9 +1226,46 @@ def run_bankard():
     st.divider()
     st.subheader("📦 Descargas")
 
+    # Aplicar mapeo de columnas para el archivo principal
+    mapeo_columnas_bankard = {
+        "primer_nombre": "primer_nombre_bankard",
+        "cupo": "Cupo_Aprobado_OB_BK", 
+        "BIN": "Marca_BK_OB",
+        "correo": "correo",
+        "telefono": "telefono"
+    }
+    
+    columnas_exportadas_principal = [
+        "primer_nombre_bankard",
+        "Cupo_Aprobado_OB_BK",
+        "Marca_BK_OB", 
+        "correo",
+        "telefono"
+    ]
+    
+    # Crear DataFrame mapeado para el archivo principal
+    df_mapeado = df.copy()
+    for col_original, col_nueva in mapeo_columnas_bankard.items():
+        if col_original in df_mapeado.columns:
+            df_mapeado[col_nueva] = df_mapeado[col_original]
+    
+    # Formatear cupo con comas
+    if "Cupo_Aprobado_OB_BK" in df_mapeado.columns:
+        df_mapeado["Cupo_Aprobado_OB_BK"] = df_mapeado["Cupo_Aprobado_OB_BK"].apply(
+            lambda x: f"{int(x):,}" if str(x).strip() != "" and str(x).strip() != "nan" else ""
+        )
+    
+    # Seleccionar solo las columnas mapeadas
+    df_final = df_mapeado.reindex(columns=columnas_exportadas_principal)
+    
+    # Asegurar que todas las columnas existan
+    for col in columnas_exportadas_principal:
+        if col not in df_final.columns:
+            df_final[col] = ""
+
     st.download_button(
         "⬇️ Base Bankard LIMPIA.xlsx",
-        data=df_to_excel_bytes(df, sheet_name="base"),
+        data=df_to_excel_bytes(df_final, sheet_name="base"),
         file_name="Base Bankard LIMPIA.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
@@ -1040,6 +1279,7 @@ def run_bankard():
             mime="application/zip",
         )
         st.caption("Columnas en cada archivo segmentado: " + ", ".join(columnas_zip))
+        st.caption("📋 **Mapeo de columnas:** primer_nombre → primer_nombre_bankard, cupo → Cupo_Aprobado_OB_BK, BIN → Marca_BK_OB")
     else:
         st.info("No hay registros para exportar por tipo y exclusión.")
 
