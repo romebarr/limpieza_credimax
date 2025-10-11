@@ -39,12 +39,13 @@ Mapeo aplicado:
 
 ## 📁 Archivos Generados
 
-### **Base Bankard LIMPIA.xlsx**
+### **Bankard_General_{FECHA}.xlsx**
 - Todos los registros con `TIPO = "No Clientes"`
 - 5 columnas mapeadas según especificación
+- **Ejemplo**: `Bankard_General_1011.xlsx`
 
-### **ZIP Segmentado**
-- Archivos: `No_Clientes_SI_1110.xlsx`, `No_Clientes_NO_1110.xlsx`
+### **Bankard_Segmentado_{FECHA}.zip**
+- Archivos: `Bankard_No_Clientes_Excluir_1011.xlsx`, `Bankard_No_Clientes_1011.xlsx`
 - Segmentación por exclusión (SI/NO)
 - Mismo mapeo de columnas
 

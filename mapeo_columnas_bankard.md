@@ -16,16 +16,21 @@ Los archivos de Bankard ahora exportan **únicamente 5 columnas** con nombres es
 
 ## 📁 Archivos de Descarga
 
-### 1. **Base Bankard LIMPIA.xlsx**
+### 1. **Bankard_General_{FECHA}.xlsx**
 - Contiene **todas las cédulas** procesadas
 - **5 columnas** con nombres mapeados
 - **Cupo formateado** con separadores de miles (ej: 1,000)
+- **Ejemplo**: `Bankard_General_1011.xlsx`
 
-### 2. **ZIP por tipo y exclusión**
+### 2. **Bankard_Segmentado_{FECHA}.zip**
 - Archivos segmentados por `TIPO` y `exclusion`
 - **Mismo mapeo** de columnas
-- **Estructura**: `{TIPO}_{EXCLUSION}_{FECHA}.xlsx`
-- **Ejemplo**: `VISA_ORO_SI_1110.xlsx`
+- **Nomenclatura**:
+  - Con exclusión: `Bankard_{TIPO}_Excluir_{FECHA}.xlsx`
+  - Sin exclusión: `Bankard_{TIPO}_{FECHA}.xlsx`
+- **Ejemplos**: 
+  - `Bankard_No_Clientes_Excluir_1011.xlsx`
+  - `Bankard_VISA_ORO_1011.xlsx`
 
 ## 🔄 Procesamiento
 

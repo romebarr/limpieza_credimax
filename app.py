@@ -798,7 +798,12 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
                         subset_final[col] = ""
                 
                 nombre_tipo = safe_filename(tipo) or "SIN_TIPO"
-                nombre_archivo = f"{nombre_tipo}_{excl}_{hoy_str}.xlsx"
+                
+                # Formato de nombre según exclusión
+                if excl == "SI":
+                    nombre_archivo = f"Bankard_{nombre_tipo}_Excluir_{hoy_str}.xlsx"
+                else:  # NO
+                    nombre_archivo = f"Bankard_{nombre_tipo}_{hoy_str}.xlsx"
                 zf.writestr(nombre_archivo, df_to_excel_bytes(subset_final, sheet_name="base"))
                 archivos += 1
 
@@ -1271,19 +1276,24 @@ def run_bankard():
         if col not in df_final.columns:
             df_final[col] = ""
 
+    # Generar nombre del archivo principal con fecha
+    fecha_archivo = datetime.now().strftime("%d%m")
+    nombre_archivo_principal = f"Bankard_General_{fecha_archivo}.xlsx"
+    
     st.download_button(
         "⬇️ Base Bankard LIMPIA.xlsx",
         data=df_to_excel_bytes(df_final, sheet_name="base"),
-        file_name="Base Bankard LIMPIA.xlsx",
+        file_name=nombre_archivo_principal,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
     zip_bytes, columnas_zip = preparar_zip_bankard(df)
     if zip_bytes:
+        fecha_zip = datetime.now().strftime("%d%m")
         st.download_button(
             "⬇️ Descargar ZIP por tipo y exclusión",
             data=zip_bytes,
-            file_name=f"Bankard_segmentado_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+            file_name=f"Bankard_Segmentado_{fecha_zip}.zip",
             mime="application/zip",
         )
         st.caption("Columnas en cada archivo segmentado: " + ", ".join(columnas_zip))
