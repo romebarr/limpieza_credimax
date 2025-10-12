@@ -76,32 +76,33 @@ def mostrar_exclusiones_bankard(exclusiones_info):
         mostrar_errores_archivo(exclusiones_info["errores"], "Errores en Exclusiones")
 
 
-def mostrar_bins_bankard(bins_info):
-    """
-    Muestra información sobre la corrección de BINs.
-    
-    Args:
-        bins_info: Información sobre BINs
-    """
-    st.subheader("🔧 Corrección de BINs")
-    
-    if "bins_problematicos" in bins_info and bins_info["bins_problematicos"]:
-        st.warning(f"⚠️ Se encontraron {len(bins_info['bins_problematicos'])} BINs problemáticos")
-        
-        # Mostrar BINs problemáticos
-        with st.expander("Ver BINs problemáticos"):
-            for bin_problema in bins_info["bins_problematicos"]:
-                st.write(f"• {bin_problema}")
-        
-        # Mostrar sugerencias si están disponibles
-        if "sugerencias" in bins_info and bins_info["sugerencias"]:
-            st.info("💡 Sugerencias automáticas disponibles")
-            for bin_problema, sugerencias in bins_info["sugerencias"].items():
-                with st.expander(f"Sugerencias para: {bin_problema}"):
-                    for sugerencia in sugerencias:
-                        st.write(f"• {sugerencia}")
-    else:
-        st.success("✅ Todos los BINs son válidos")
+# Función desactivada - La corrección de BINs se muestra en la sección de procesamiento
+# def mostrar_bins_bankard(bins_info):
+#     """
+#     Muestra información sobre la corrección de BINs.
+#     
+#     Args:
+#         bins_info: Información sobre BINs
+#     """
+#     st.subheader("🔧 Corrección de BINs")
+#     
+#     if "bins_problematicos" in bins_info and bins_info["bins_problematicos"]:
+#         st.warning(f"⚠️ Se encontraron {len(bins_info['bins_problematicos'])} BINs problemáticos")
+#         
+#         # Mostrar BINs problemáticos
+#         with st.expander("Ver BINs problemáticos"):
+#             for bin_problema in bins_info["bins_problematicos"]:
+#                 st.write(f"• {bin_problema}")
+#         
+#         # Mostrar sugerencias si están disponibles
+#         if "sugerencias" in bins_info and bins_info["sugerencias"]:
+#             st.info("💡 Sugerencias automáticas disponibles")
+#             for bin_problema, sugerencias in bins_info["sugerencias"].items():
+#                 with st.expander(f"Sugerencias para: {bin_problema}"):
+#                     for sugerencia in sugerencias:
+#                         st.write(f"• {sugerencia}")
+#     else:
+#         st.success("✅ Todos los BINs son válidos")
 
 
 def mostrar_resultados_bankard(df, config, resultados):
@@ -119,10 +120,6 @@ def mostrar_resultados_bankard(df, config, resultados):
     # Información de exclusiones
     if "exclusiones" in resultados:
         mostrar_exclusiones_bankard(resultados["exclusiones"])
-    
-    # Información de BINs
-    if "bins" in resultados:
-        mostrar_bins_bankard(resultados["bins"])
     
     # Vista previa de datos
     mostrar_preview_datos(df, "👀 Vista Previa de Datos")
