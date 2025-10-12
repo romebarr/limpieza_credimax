@@ -60,13 +60,14 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
         if col_original in df_filtrado.columns:
             df_filtrado[col_nueva] = df_filtrado[col_original]
 
-    # Columnas finales que se exportarán
+    # Columnas finales que se exportarán (incluyendo la columna de tipo para agrupación)
     columnas_finales = [
         "primer_nombre_bankard",
         "Cupo_Aprobado_OB_BK",
         "Marca_BK_OB", 
         "correo",
-        "telefono"
+        "telefono",
+        col_tipo  # Incluir la columna de tipo para poder agrupar
     ]
     
     # Asegurar que todas las columnas existen
@@ -106,8 +107,12 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
             nombre_tipo = safe_filename(tipo) or "SIN_TIPO"
             nombre_archivo_excel = f"Bankard_{nombre_tipo}_{hoy_str}.xlsx"
 
+            # Excluir la columna de tipo del archivo Excel final
+            columnas_exportar = [col for col in grupo.columns if col != col_tipo]
+            grupo_exportar = grupo[columnas_exportar].copy()
+
             # Convertir a bytes
-            excel_bytes = df_to_excel_bytes(grupo, sheet_name="base")
+            excel_bytes = df_to_excel_bytes(grupo_exportar, sheet_name="base")
             zf.writestr(nombre_archivo_excel, excel_bytes)
             archivos_generados.append(nombre_archivo_excel)
 
