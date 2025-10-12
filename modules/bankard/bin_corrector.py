@@ -232,7 +232,13 @@ def mostrar_sugerencias_interactivas_bin(bins_problematicos, sugerencias_automat
     Returns:
         dict: Diccionario con correcciones confirmadas por el usuario
     """
-    import streamlit as st
+    # Importar streamlit solo cuando se necesite
+    try:
+        import streamlit as st
+    except ImportError:
+        # Si no se puede importar streamlit, retornar diccionario vacío
+        print("⚠️ Streamlit no disponible, retornando correcciones vacías")
+        return {}
     
     correcciones_confirmadas = {}
     

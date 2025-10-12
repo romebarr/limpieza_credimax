@@ -24,11 +24,11 @@ from .common.utils import df_to_excel_bytes
 # Imports de Credimax
 from .credimax.processor import preparar_zip_por_campana
 
-# Imports de Bankard
-from .bankard.processor import preparar_zip_bankard
-from .bankard.cleaner import limpiar_cupo_bankard, limpiar_nombres_bankard
-from .bankard.exclusions import cargar_exclusiones_consolidadas
-from .bankard.bin_corrector import cargar_memoria_correcciones, calcular_similitud_bin
+# Imports de Bankard (comentados temporalmente para evitar problemas de importación)
+# from .bankard.processor import preparar_zip_bankard
+# from .bankard.cleaner import limpiar_cupo_bankard, limpiar_nombres_bankard
+# from .bankard.exclusions import cargar_exclusiones_consolidadas
+# from .bankard.bin_corrector import cargar_memoria_correcciones, calcular_similitud_bin
 
 __all__ = [
     # Common
@@ -44,11 +44,11 @@ __all__ = [
     # Credimax
     "preparar_zip_por_campana",
     
-    # Bankard
-    "preparar_zip_bankard",
-    "limpiar_cupo_bankard",
-    "limpiar_nombres_bankard",
-    "cargar_exclusiones_consolidadas",
-    "cargar_memoria_correcciones",
-    "calcular_similitud_bin",
+    # Bankard (comentados temporalmente)
+    # "preparar_zip_bankard",
+    # "limpiar_cupo_bankard",
+    # "limpiar_nombres_bankard",
+    # "cargar_exclusiones_consolidadas",
+    # "cargar_memoria_correcciones",
+    # "calcular_similitud_bin",
 ]
