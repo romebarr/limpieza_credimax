@@ -32,7 +32,7 @@ def asignar_campanas_automaticamente(df):
         df["Campaña Growth Original"] = ""
     
     # Verificar que existen las columnas necesarias
-    columnas_requeridas = ["CANAL", "PRODUCTO", "SEGMENTO", "TESTEO_CUOTAS"]
+    columnas_requeridas = ["CANAL", "Producto", "SEGMENTO", "TESTEO CUOTA"]
     columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
     
     if columnas_faltantes:
@@ -56,9 +56,9 @@ def asignar_campanas_automaticamente(df):
     
     # Preparar columnas necesarias
     canal_n = df["CANAL"].fillna("").astype(str).str.strip().str.upper()
-    prod_n = df["PRODUCTO"].fillna("").astype(str).str.strip().str.upper()
+    prod_n = df["Producto"].fillna("").astype(str).str.strip().str.upper()
     seg_n = df["SEGMENTO"].fillna("").astype(str).str.strip().str.upper()
-    test_n = df["TESTEO_CUOTAS"].fillna("").astype(str).str.strip().str.upper()
+    test_n = df["TESTEO CUOTA"].fillna("").astype(str).str.strip().str.upper()
     
     # Definir máscaras básicas
     is_online = canal_n == "ONLINE"
