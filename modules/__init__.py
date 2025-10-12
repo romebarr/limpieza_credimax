@@ -18,8 +18,8 @@ from .common.validators import validar_cedula_10, normalizar_celular_ec
 from .common.formatters import a_nombre_propio, cupo_a_texto_miles_coma
 from .common.utils import df_to_excel_bytes
 
-# Imports de integraciones
-from .integrations.bitly import acortar_enlace_bitly
+# Imports de integraciones (sin streamlit para compatibilidad)
+# from .integrations.bitly import acortar_enlace_bitly  # Requiere streamlit
 
 # Imports de Credimax
 from .credimax.processor import preparar_zip_por_campana
@@ -39,7 +39,7 @@ __all__ = [
     "df_to_excel_bytes",
     
     # Integrations
-    "acortar_enlace_bitly",
+    # "acortar_enlace_bitly",  # Requiere streamlit
     
     # Credimax
     "preparar_zip_por_campana",
