@@ -43,6 +43,7 @@ from modules.bankard.bin_corrector import (
     detectar_bins_no_permitidos_inteligente, aplicar_correcciones_bin
 )
 from modules.bankard.sms_generator import generar_plantilla_sms_bankard_segmentada
+from modules.bankard.column_detector import detectar_columnas_bankard
 
 # Imports comunes
 from modules.common.validators import validar_cedula_10, normalizar_celular_ec
@@ -123,6 +124,10 @@ if archivo is not None:
             # FLUJO BANKARD
             # =============================
             config = mostrar_sidebar_bankard()
+            
+            # Detectar columnas automáticamente
+            columnas_detectadas = detectar_columnas_bankard(df)
+            config.update(columnas_detectadas)
             
             # Cargar exclusiones
             exclusion_files = st.sidebar.file_uploader(

@@ -26,21 +26,13 @@ def mostrar_sidebar_bankard():
     """
     crear_sidebar_configuracion("Configuración Bankard")
     
-    # Configuración de segmentación
+    # Configuración de segmentación (automática)
     st.sidebar.subheader("1) Segmentación")
-    col_tipo = st.sidebar.selectbox(
-        "Columna de Tipo",
-        ["TIPO ", "TIPO", "Tipo", "TARJETA"],
-        index=0,
-        help="Selecciona la columna que contiene los tipos de tarjeta"
-    )
+    st.sidebar.info("ℹ️ Las columnas se detectan automáticamente")
     
-    col_exclusion = st.sidebar.selectbox(
-        "Columna de Exclusión",
-        ["exclusion", "EXCLUSION", "Exclusion", "EXCLUIDO"],
-        index=0,
-        help="Selecciona la columna que indica exclusión"
-    )
+    # Valores por defecto (se detectan automáticamente en el procesamiento)
+    col_tipo = "TIPO "  # Valor por defecto
+    col_exclusion = "exclusion"  # Valor por defecto
     
     # Configuración de exportación
     st.sidebar.subheader("2) Exportación")

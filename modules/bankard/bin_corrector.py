@@ -6,6 +6,7 @@ Contiene la funcionalidad para detectar, sugerir y corregir BINs automáticament
 
 import json
 import difflib
+import pandas as pd
 from pathlib import Path
 from datetime import datetime
 
