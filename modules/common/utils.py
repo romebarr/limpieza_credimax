@@ -50,3 +50,28 @@ def ensure_column_from(df, target, sources=(), fill_value=""):
     
     df[target] = fill_value
     return target
+
+
+def procesar_archivo_excel_exclusiones(archivo_path, nombre_archivo):
+    """
+    Procesa un archivo Excel de exclusiones y extrae las cédulas.
+    
+    Args:
+        archivo_path: Ruta al archivo Excel
+        nombre_archivo: Nombre del archivo para mensajes de error
+        
+    Returns:
+        tuple: (cedulas_set, error_message) o (None, error_message) si falla
+    """
+    from modules.common.validators import pad_10_digitos
+    
+    try:
+        df_exc = pd.read_excel(archivo_path, dtype=str)
+    except Exception as exc:
+        return None, f"{nombre_archivo}: {exc}"
+    
+    if "IDENTIFICACION" not in df_exc.columns:
+        return None, f"{nombre_archivo}: no contiene columna 'IDENTIFICACION'"
+    
+    cedulas = set(df_exc["IDENTIFICACION"].astype(str).apply(pad_10_digitos))
+    return cedulas, None
