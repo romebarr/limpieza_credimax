@@ -220,6 +220,29 @@ def detectar_bins_no_permitidos_inteligente(df, memoria_correcciones, estadistic
     return bins_problematicos, sugerencias_automaticas
 
 
+def mostrar_estado_memoria_bin(memoria_correcciones):
+    """
+    Muestra el estado actual de la memoria de correcciones de BINs.
+    
+    Args:
+        memoria_correcciones: Diccionario con correcciones guardadas
+    """
+    try:
+        import streamlit as st
+    except ImportError:
+        return
+    
+    if memoria_correcciones:
+        st.subheader("📚 Memoria de Correcciones de BINs")
+        with st.expander("Ver correcciones guardadas"):
+            for bin_original, correccion in memoria_correcciones.items():
+                st.write(f"`{bin_original}` → `{correccion}`")
+        
+        st.info(f"💾 Se tienen {len(memoria_correcciones)} correcciones guardadas en memoria")
+    else:
+        st.info("📝 No hay correcciones guardadas en memoria")
+
+
 def mostrar_sugerencias_interactivas_bin(bins_problematicos, sugerencias_automaticas, memoria_correcciones):
     """
     Muestra sugerencias interactivas para BINs problemáticos y permite al usuario confirmar.
@@ -293,7 +316,13 @@ def mostrar_sugerencias_interactivas_bin(bins_problematicos, sugerencias_automat
             
             # Guardar en archivo
             guardar_memoria_correcciones(memoria_correcciones)
+            
+            # Recargar memoria para asegurar que se actualice
+            memoria_actualizada = cargar_memoria_correcciones()
+            memoria_correcciones.update(memoria_actualizada)
+            
             st.success(f"✅ Se guardaron {len(correcciones_confirmadas)} correcciones en memoria")
+            st.info("🔄 La memoria se ha actualizado. Los BINs corregidos no aparecerán en futuros procesamientos.")
     
     return correcciones_confirmadas
 

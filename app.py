@@ -41,7 +41,7 @@ from modules.bankard.exclusions import (
 from modules.bankard.bin_corrector import (
     cargar_memoria_correcciones, cargar_estadisticas_bin,
     detectar_bins_no_permitidos_inteligente, aplicar_correcciones_bin,
-    mostrar_sugerencias_interactivas_bin, VALORES_BIN_PERMITIDOS
+    mostrar_sugerencias_interactivas_bin, mostrar_estado_memoria_bin, VALORES_BIN_PERMITIDOS
 )
 from modules.bankard.sms_generator import generar_plantilla_sms_bankard_segmentada
 from modules.bankard.column_detector import detectar_columnas_bankard
@@ -175,6 +175,9 @@ if archivo is not None:
                 df, memoria_correcciones, estadisticas_bin
             )
             
+            # Mostrar estado de memoria de correcciones
+            mostrar_estado_memoria_bin(memoria_correcciones)
+            
             # Mostrar interfaz interactiva para corrección de BINs
             correcciones_confirmadas = {}
             if bins_problematicos:
@@ -182,6 +185,10 @@ if archivo is not None:
                 correcciones_confirmadas = mostrar_sugerencias_interactivas_bin(
                     bins_problematicos, sugerencias, memoria_correcciones
                 )
+                
+                # Recargar memoria después de posibles correcciones
+                if correcciones_confirmadas:
+                    memoria_correcciones = cargar_memoria_correcciones()
             else:
                 st.success("✅ No se encontraron BINs problemáticos")
             
