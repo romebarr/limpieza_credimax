@@ -387,16 +387,31 @@ def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None, correc
         
         # Si no se puede corregir, intentar mapeo básico
         mapeo_basico = {
+            # Variaciones de Visa Oro
             "visa gold": "Visa Oro",
             "visa oro": "Visa Oro",
+            "visa oro bk plus": "Visa Oro",
+            
+            # Variaciones de Visa Platinum
+            "visa platinum": "Visa Platinum",
+            "visa platinum bk plus": "Visa Platinum",
+            
+            # Variaciones de Visa Signature
+            "visa signature": "Visa Signature",
+            
+            # Variaciones de Visa Infinite
+            "visa infinite": "Visa Infinite",
+            
+            # Variaciones de Visa Clásica
+            "visa clásica": "Visa Clásica",
+            "visa clasica": "Visa Clásica",
+            "visa clasica bk plus": "Visa Clásica",
+            
+            # Variaciones de Mastercard
             "mastercard black": "Mastercard Black",
             "mastercard classic": "Mastercard Clásica",
             "mastercard clásica": "Mastercard Clásica",
-            "visa platinum": "Visa Platinum",
-            "visa clásica": "Visa Clásica",
-            "visa clasica": "Visa Clásica",
-            "visa infinite": "Visa Infinite",
-            "visa signature": "Visa Signature"
+            "mastercard oro": "Mastercard Oro"
         }
         
         val_lower = val.lower().strip()
