@@ -799,9 +799,9 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
                 monto = str(row.get("CUPO", "")).strip()
                 tasa = str(row.get("Tasa", "")).strip()
                 
-                # Limpiar monto (quitar comas para mostrar solo números)
+                # Mantener formato con comas para separadores de miles
                 if monto and monto != "nan":
-                    monto_limpio = monto.replace(",", "")
+                    monto_limpio = monto  # Mantener el formato original con comas
                 else:
                     monto_limpio = "0"
                 
@@ -885,9 +885,9 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
                 marca = str(row.get("BIN", "")).strip()
                 cupo = str(row.get("cupo", "")).strip()
                 
-                # Limpiar cupo (quitar comas para mostrar solo números)
+                # Mantener formato con comas para separadores de miles
                 if cupo and cupo != "nan":
-                    cupo_limpio = cupo.replace(",", "")
+                    cupo_limpio = cupo  # Mantener el formato original con comas
                 else:
                     cupo_limpio = "0"
                 
