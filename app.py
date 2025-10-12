@@ -749,8 +749,8 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
         col_campana,
         "IND_DESEMBOLSO",
         "CELULAR",
-        "monto_credito_aprob",
-        "Tasa_Credito_Aprob",
+        "CUPO",  # Columna original del monto
+        "Tasa",  # Columna original de la tasa
     }
 
     df_trabajo = df.copy()
@@ -796,8 +796,8 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
                 mensaje = sms_texto
                 
                 # Reemplazar variables
-                monto = str(row.get("monto_credito_aprob", "")).strip()
-                tasa = str(row.get("Tasa_Credito_Aprob", "")).strip()
+                monto = str(row.get("CUPO", "")).strip()
+                tasa = str(row.get("Tasa", "")).strip()
                 
                 # Limpiar monto (quitar comas para mostrar solo números)
                 if monto and monto != "nan":
@@ -848,10 +848,10 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
     # Asegurar que las columnas necesarias existan
     if "telefono" not in df.columns:
         df["telefono"] = ""
-    if "Marca_BK_OB" not in df.columns:
-        df["Marca_BK_OB"] = ""
-    if "Cupo_Aprobado_OB_BK" not in df.columns:
-        df["Cupo_Aprobado_OB_BK"] = ""
+    if "BIN" not in df.columns:
+        df["BIN"] = ""
+    if "cupo" not in df.columns:
+        df["cupo"] = ""
 
     hoy_str = datetime.now().strftime("%d%m")
     zip_buf = io.BytesIO()
@@ -882,8 +882,8 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
                 mensaje = sms_texto
                 
                 # Reemplazar variables
-                marca = str(row.get("Marca_BK_OB", "")).strip()
-                cupo = str(row.get("Cupo_Aprobado_OB_BK", "")).strip()
+                marca = str(row.get("BIN", "")).strip()
+                cupo = str(row.get("cupo", "")).strip()
                 
                 # Limpiar cupo (quitar comas para mostrar solo números)
                 if cupo and cupo != "nan":
