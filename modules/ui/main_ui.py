@@ -150,12 +150,7 @@ def mostrar_sidebar_info():
     **Última actualización:** 2024
     """)
     
-    st.sidebar.markdown("### 🔗 Enlaces Útiles")
-    st.sidebar.markdown("""
-    - [Documentación](https://github.com/romebarr/limpieza_credimax)
-    - [Lista de Funciones](FUNCIONES.md)
-    - [Reportar Bug](https://github.com/romebarr/limpieza_credimax/issues)
-    """)
+    # Enlaces removidos de la interfaz - solo en documentación
 
 
 def limpiar_cache():
@@ -174,7 +169,6 @@ def mostrar_footer():
     st.divider()
     st.markdown("""
     <div style='text-align: center; color: #666; font-size: 0.8em;'>
-        <p>Desarrollado por <strong>SM Growth Lab</strong> | 
-        <a href='https://github.com/romebarr/limpieza_credimax' target='_blank'>GitHub</a></p>
+        <p>Desarrollado por <strong>SM Growth Lab</strong></p>
     </div>
     """, unsafe_allow_html=True)
