@@ -23,6 +23,12 @@ try:
     from modules.bankard.bin_corrector import cargar_memoria_correcciones, calcular_similitud_bin
     # from modules.bankard.sms_generator import generar_plantilla_sms_bankard_segmentada  # Requiere streamlit
     
+    # Módulos de UI (sin streamlit para pruebas)
+    # from modules.ui.common_ui import mostrar_estadisticas_generales  # Requiere streamlit
+    # from modules.ui.credimax_ui import mostrar_sidebar_credimax  # Requiere streamlit
+    # from modules.ui.bankard_ui import mostrar_sidebar_bankard  # Requiere streamlit
+    # from modules.ui.main_ui import configurar_pagina  # Requiere streamlit
+    
     print("✅ Todos los imports funcionan correctamente")
     
     # Probar algunas funciones básicas
