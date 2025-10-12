@@ -242,18 +242,44 @@ if archivo is not None:
             
             # Mostrar estadísticas de BINs
             if "BIN" in df.columns:
-                bins_unicos = df["BIN"].value_counts()
-                st.subheader("📊 Estadísticas de BINs")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Total de BINs únicos", len(bins_unicos))
-                with col2:
-                    bins_validos = sum(1 for bin_val in bins_unicos.index if bin_val in VALORES_BIN_PERMITIDOS)
-                    st.metric("BINs válidos", f"{bins_validos}/{len(bins_unicos)}")
+                # Filtrar valores nulos o vacíos
+                df_bins = df[df["BIN"].notna() & (df["BIN"] != "") & (df["BIN"] != "nan")].copy()
                 
-                # Mostrar distribución de BINs
-                with st.expander("Ver distribución de BINs"):
-                    st.dataframe(bins_unicos.reset_index().rename(columns={"index": "BIN", "BIN": "Cantidad"}))
+                if not df_bins.empty:
+                    bins_unicos = df_bins["BIN"].value_counts()
+                    st.subheader("📊 Estadísticas de BINs")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total de BINs únicos", len(bins_unicos))
+                    with col2:
+                        bins_validos = sum(1 for bin_val in bins_unicos.index if bin_val in VALORES_BIN_PERMITIDOS)
+                        st.metric("BINs válidos", f"{bins_validos}/{len(bins_unicos)}")
+                    with col3:
+                        total_registros = len(df_bins)
+                        st.metric("Total registros", total_registros)
+                    
+                    # Mostrar distribución de BINs
+                    with st.expander("Ver distribución de BINs"):
+                        # Crear DataFrame con información detallada
+                        df_distribucion = bins_unicos.reset_index()
+                        df_distribucion.columns = ["BIN", "Cantidad"]
+                        df_distribucion["Porcentaje"] = (df_distribucion["Cantidad"] / total_registros * 100).round(2)
+                        df_distribucion["Es Válido"] = df_distribucion["BIN"].apply(
+                            lambda x: "✅" if x in VALORES_BIN_PERMITIDOS else "❌"
+                        )
+                        
+                        st.dataframe(df_distribucion, use_container_width=True)
+                        
+                        # Mostrar resumen de BINs problemáticos
+                        bins_problematicos_actuales = [bin_val for bin_val in bins_unicos.index 
+                                                     if bin_val not in VALORES_BIN_PERMITIDOS]
+                        if bins_problematicos_actuales:
+                            st.warning(f"⚠️ Aún hay {len(bins_problematicos_actuales)} BINs problemáticos sin corregir")
+                        else:
+                            st.success("✅ Todos los BINs son válidos")
+                else:
+                    st.warning("⚠️ No se encontraron BINs válidos en el DataFrame")
             
             # Mostrar resultados
             mostrar_resultados_bankard(df, config, resultados)
