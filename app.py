@@ -273,8 +273,12 @@ if archivo is not None:
                         
                         # Mostrar resumen de BINs problemáticos
                         bins_problematicos_actuales = [bin_val for bin_val in bins_unicos.index 
-                                                     if bin_val not in VALORES_BIN_PERMITIDOS]
-                        if bins_problematicos_actuales:
+                                                     if bin_val not in VALORES_BIN_PERMITIDOS and bin_val != "BIN NO VÁLIDO"]
+                        bins_no_validos = [bin_val for bin_val in bins_unicos.index if bin_val == "BIN NO VÁLIDO"]
+                        
+                        if bins_no_validos:
+                            st.error(f"❌ Hay {len(bins_no_validos)} registros con BINs que no se pudieron corregir automáticamente")
+                        elif bins_problematicos_actuales:
                             st.warning(f"⚠️ Aún hay {len(bins_problematicos_actuales)} BINs problemáticos sin corregir")
                         else:
                             st.success("✅ Todos los BINs son válidos")

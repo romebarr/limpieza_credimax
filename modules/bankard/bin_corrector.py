@@ -373,7 +373,38 @@ def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None, correc
         if val_normalizado in VALORES_BIN_PERMITIDOS:
             return val_normalizado
         
-        return val  # Mantener valor original si no se puede corregir
+        # Prioridad 5: Corrección automática agresiva
+        if estadisticas is not None:
+            sugerencias = generar_sugerencias_inteligentes(val, memoria_correcciones, estadisticas)
+            if sugerencias:
+                # Aplicar la primera sugerencia automáticamente si tiene confianza moderada
+                primera_sugerencia = sugerencias[0]
+                similitud = calcular_similitud_bin(val, primera_sugerencia)
+                if similitud > 0.5:  # Umbral más permisivo para corrección automática
+                    if estadisticas is not None:
+                        actualizar_estadisticas_bin(val, primera_sugerencia, estadisticas)
+                    return primera_sugerencia
+        
+        # Si no se puede corregir, intentar mapeo básico
+        mapeo_basico = {
+            "visa gold": "Visa Oro",
+            "visa oro": "Visa Oro",
+            "mastercard black": "Mastercard Black",
+            "mastercard classic": "Mastercard Clásica",
+            "mastercard clásica": "Mastercard Clásica",
+            "visa platinum": "Visa Platinum",
+            "visa clásica": "Visa Clásica",
+            "visa clasica": "Visa Clásica",
+            "visa infinite": "Visa Infinite",
+            "visa signature": "Visa Signature"
+        }
+        
+        val_lower = val.lower().strip()
+        if val_lower in mapeo_basico:
+            return mapeo_basico[val_lower]
+        
+        # Si todo falla, marcar como "BIN NO VÁLIDO" para identificar problemas
+        return "BIN NO VÁLIDO"
     
     df["BIN"] = df["BIN"].apply(corregir)
     return df
