@@ -6,6 +6,7 @@ Contiene componentes de interfaz específicos para el flujo de Credimax.
 
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from modules.ui.common_ui import (
     mostrar_estadisticas_generales, 
     mostrar_preview_datos,
