@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 
 # =============================
@@ -80,6 +81,13 @@ MEMORIA_ESTADISTICAS_PATH = Path("memoria_estadisticas_bin.json")
 EXCLUSIONES_BANKARD_DIR = Path("data/exclusiones_bankard")
 EXCLUSIONES_CONSOLIDADAS_PATH = Path("exclusiones_consolidadas.json")
 EXCLUSIONES_BANKARD_DIR.mkdir(parents=True, exist_ok=True)
+
+# =============================
+# Configuración Bitly
+# =============================
+BITLY_ACCESS_TOKEN = "d9dad23cd1329e489dcbe9c52cd1770e856c50d5"
+BITLY_DOMAIN = "mkt-bb.com"
+BITLY_API_URL = "https://api-ssl.bitly.com/v4/shorten"
 
 # =============================
 # Funciones comunes
@@ -163,6 +171,38 @@ def safe_filename(s: str) -> str:
         .replace("|", "")
         .strip()
     )
+
+
+def acortar_enlace_bitly(url_larga):
+    """Acorta un enlace usando Bitly API"""
+    if not url_larga or not url_larga.strip():
+        return url_larga
+    
+    try:
+        headers = {
+            "Authorization": f"Bearer {BITLY_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "long_url": url_larga.strip(),
+            "domain": BITLY_DOMAIN
+        }
+        
+        response = requests.post(BITLY_API_URL, headers=headers, json=data, timeout=10)
+        
+        if response.status_code == 200 or response.status_code == 201:
+            result = response.json()
+            return result.get("link", url_larga)
+        else:
+            # Si falla la API, devolver el enlace original
+            st.warning(f"⚠️ No se pudo acortar el enlace: {response.status_code}")
+            return url_larga
+            
+    except Exception as e:
+        # Si hay cualquier error, devolver el enlace original
+        st.warning(f"⚠️ Error al acortar enlace: {str(e)}")
+        return url_larga
 
 
 def df_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "base") -> bytes:
@@ -744,6 +784,9 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
     if not sms_texto or not sms_link:
         return None, []
     
+    # Acortar el enlace usando Bitly
+    enlace_acortado = acortar_enlace_bitly(sms_link)
+    
     # Usar la misma lógica que preparar_zip_por_campana
     columnas_necesarias = {
         col_campana,
@@ -813,7 +856,7 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
                 
                 mensaje = mensaje.replace("<#monto#>", monto_limpio)
                 mensaje = mensaje.replace("<#tasa#>", tasa_limpia)
-                mensaje = mensaje.replace("<#link#>", sms_link)
+                mensaje = mensaje.replace("<#link#>", enlace_acortado)
                 
                 mensajes.append(mensaje)
                 celulares.append(row["CELULAR"])
@@ -841,6 +884,9 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
     """Genera plantillas SMS segmentadas por tipo y exclusión para Bankard"""
     if not sms_texto or not sms_link:
         return None, []
+    
+    # Acortar el enlace usando Bitly
+    enlace_acortado = acortar_enlace_bitly(sms_link)
     
     if col_tipo not in df.columns or col_exclusion not in df.columns:
         return None, []
@@ -898,7 +944,7 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
                 
                 mensaje = mensaje.replace("<#marca#>", marca)
                 mensaje = mensaje.replace("<#cupo#>", cupo_limpio)
-                mensaje = mensaje.replace("<#link#>", sms_link)
+                mensaje = mensaje.replace("<#link#>", enlace_acortado)
                 
                 mensajes.append(mensaje)
                 telefonos.append(row["telefono"])
@@ -1190,6 +1236,9 @@ def run_credimax():
 
     # Generar plantilla SMS si está habilitada
     if exportar_sms and sms_texto and sms_link:
+        # Acortar enlace para mostrar en la interfaz
+        enlace_acortado = acortar_enlace_bitly(sms_link)
+        
         zip_sms_bytes, archivos_sms = generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link)
         if zip_sms_bytes and archivos_sms:
             st.divider()
@@ -1209,6 +1258,7 @@ def run_credimax():
                 mime="application/zip",
             )
             st.caption("📱 **Plantillas SMS segmentadas por campaña** (solo registros sin desembolso)")
+            st.caption(f"🔗 **Enlace acortado**: {enlace_acortado}")
         else:
             st.warning("No se pudo generar las plantillas SMS. Verifica que haya registros con IND_DESEMBOLSO = '0', campañas válidas y celulares válidos.")
 
@@ -1563,6 +1613,9 @@ def run_bankard():
 
     # Generar plantilla SMS si está habilitada
     if exportar_sms and sms_texto and sms_link:
+        # Acortar enlace para mostrar en la interfaz
+        enlace_acortado = acortar_enlace_bitly(sms_link)
+        
         zip_sms_bytes, archivos_sms = generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link)
         if zip_sms_bytes and archivos_sms:
             st.divider()
@@ -1582,6 +1635,7 @@ def run_bankard():
                 mime="application/zip",
             )
             st.caption("📱 **Plantillas SMS segmentadas por tipo** (solo registros sin exclusión)")
+            st.caption(f"🔗 **Enlace acortado**: {enlace_acortado}")
         else:
             st.warning("No se pudo generar las plantillas SMS. Verifica que haya registros sin exclusión con teléfonos válidos.")
 
