@@ -29,6 +29,7 @@ from modules.ui.bankard_ui import (
 # Imports de procesamiento
 from modules.credimax.processor import preparar_zip_por_campana
 from modules.credimax.sms_generator import generar_plantilla_sms_credimax_segmentada
+from modules.credimax.campaign_assigner import asignar_campanas_automaticamente, mostrar_estadisticas_campanas
 from modules.bankard.processor import preparar_zip_bankard
 from modules.bankard.cleaner import (
     limpiar_cupo_bankard, filtrar_vigencia_bankard, 
@@ -92,22 +93,27 @@ if archivo is not None:
             df["primer_nombre"] = df["primer_nombre"].apply(a_nombre_propio)
             df["CUPO"] = df["CUPO"].apply(cupo_a_texto_miles_coma)
             
-            # 2. Generar base limpia
+            # 2. Asignar campañas automáticamente
+            df, estadisticas_campanas = asignar_campanas_automaticamente(df)
+            mostrar_estadisticas_campanas(estadisticas_campanas)
+            
+            # 3. Generar base limpia
             resultados["base_limpia"] = df_to_excel_bytes(df, "base_limpia")
             
-            # 3. Generar comparativo de campañas
-            if "Campaña Growth" in df.columns:
-                df_comp = df[["CEDULA", "Campaña Growth"]].copy()
+            # 4. Generar comparativo de campañas
+            if "Campaña Growth Original" in df.columns:
+                df_comp = df[["CEDULA", "Campaña Growth Original", "Campaña Growth"]].copy()
+                df_comp["Cambio Aplicado"] = df_comp["Campaña Growth Original"] != df_comp["Campaña Growth"]
                 resultados["comparativo"] = df_to_excel_bytes(df_comp, "comparacion")
             
-            # 4. Generar ZIP segmentado
+            # 5. Generar ZIP segmentado
             if config["exportar_zip"]:
                 zip_bytes, archivos = preparar_zip_por_campana(df, config["col_campana"])
                 if zip_bytes:
                     resultados["zip_bytes"] = zip_bytes
                     resultados["zip_info"] = {"archivos": archivos}
             
-            # 5. Generar plantillas SMS
+            # 6. Generar plantillas SMS
             if config["sms_texto"] and config["sms_link"]:
                 sms_bytes, archivos_sms = generar_plantilla_sms_credimax_segmentada(
                     df, config["sms_texto"], config["sms_link"], config["col_campana"]

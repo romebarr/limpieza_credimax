@@ -25,14 +25,10 @@ def mostrar_sidebar_credimax():
     """
     crear_sidebar_configuracion("Configuración Credimax")
     
-    # Configuración de segmentación
+    # Configuración automática de segmentación
     st.sidebar.subheader("1) Segmentación")
-    col_campana = st.sidebar.selectbox(
-        "Columna de Campaña",
-        ["Campaña Growth", "Campaña", "CAMPANA"],
-        index=0,
-        help="Selecciona la columna que contiene las campañas"
-    )
+    st.sidebar.info("ℹ️ Las campañas se asignan automáticamente según reglas de negocio")
+    col_campana = "Campaña Growth"  # Columna fija
     
     # Configuración de exportación
     st.sidebar.subheader("2) Exportación")
