@@ -26,16 +26,12 @@ def mostrar_sidebar_bankard():
     """
     crear_sidebar_configuracion("Configuración Bankard")
     
-    # Configuración de segmentación (automática)
-    st.sidebar.subheader("1) Segmentación")
-    st.sidebar.info("ℹ️ Las columnas se detectan automáticamente")
-    
     # Valores por defecto (se detectan automáticamente en el procesamiento)
     col_tipo = "TIPO "  # Valor por defecto
     col_exclusion = "exclusion"  # Valor por defecto
     
     # Configuración de exportación
-    st.sidebar.subheader("2) Exportación")
+    st.sidebar.subheader("1) Exportación")
     exportar_zip = st.sidebar.checkbox(
         "Generar ZIP segmentado", 
         value=True,
@@ -43,7 +39,7 @@ def mostrar_sidebar_bankard():
     )
     
     # Configuración de SMS
-    sms_texto, sms_link = mostrar_configuracion_sms("3) Plantillas SMS")
+    sms_texto, sms_link = mostrar_configuracion_sms("2) Plantillas SMS")
     
     return {
         "col_tipo": col_tipo,

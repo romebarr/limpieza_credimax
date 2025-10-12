@@ -256,15 +256,21 @@ def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None):
         if estadisticas is not None:
             sugerencias = generar_sugerencias_inteligentes(val, memoria_correcciones, estadisticas)
             if sugerencias:
-                # Usar la primera sugerencia automáticamente si tiene alta confianza
+                # Usar la primera sugerencia automáticamente si tiene confianza moderada
                 primera_sugerencia = sugerencias[0]
-                # Solo auto-aplicar si la similitud es muy alta (>0.8)
                 similitud = calcular_similitud_bin(val, primera_sugerencia)
-                if similitud > 0.8:
+                # Reducir umbral a 0.6 para ser más permisivo
+                if similitud > 0.6:
                     actualizar_estadisticas_bin(val, primera_sugerencia, estadisticas)
                     return primera_sugerencia
         
-        return val.title()
+        # Si no hay sugerencias buenas, intentar normalizar el texto
+        val_normalizado = val.title()
+        # Verificar si el valor normalizado está en los permitidos
+        if val_normalizado in VALORES_BIN_PERMITIDOS:
+            return val_normalizado
+        
+        return val  # Mantener valor original si no se puede corregir
     
     df["BIN"] = df["BIN"].apply(corregir)
     return df

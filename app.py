@@ -40,7 +40,8 @@ from modules.bankard.exclusions import (
 )
 from modules.bankard.bin_corrector import (
     cargar_memoria_correcciones, cargar_estadisticas_bin,
-    detectar_bins_no_permitidos_inteligente, aplicar_correcciones_bin
+    detectar_bins_no_permitidos_inteligente, aplicar_correcciones_bin,
+    VALORES_BIN_PERMITIDOS
 )
 from modules.bankard.sms_generator import generar_plantilla_sms_bankard_segmentada
 from modules.bankard.column_detector import detectar_columnas_bankard
@@ -173,7 +174,27 @@ if archivo is not None:
             bins_problematicos, sugerencias = detectar_bins_no_permitidos_inteligente(
                 df, memoria_correcciones, estadisticas_bin
             )
+            
+            # Mostrar información sobre BINs problemáticos
+            if bins_problematicos:
+                st.warning(f"⚠️ Se encontraron {len(bins_problematicos)} BINs no permitidos")
+                with st.expander("Ver BINs problemáticos y sugerencias"):
+                    for bin_problema in bins_problematicos:
+                        st.write(f"**BIN problemático:** `{bin_problema}`")
+                        if bin_problema in sugerencias:
+                            st.write(f"**Sugerencias:** {', '.join(sugerencias[bin_problema])}")
+                        st.write("---")
+            
+            # Aplicar correcciones y contar cambios
+            df_antes = df.copy()
             df = aplicar_correcciones_bin(df, memoria_correcciones, estadisticas_bin)
+            
+            # Contar correcciones aplicadas
+            cambios_bin = 0
+            if "BIN" in df.columns and "BIN" in df_antes.columns:
+                cambios_bin = (df["BIN"] != df_antes["BIN"]).sum()
+                if cambios_bin > 0:
+                    st.success(f"✅ Se aplicaron {cambios_bin} correcciones automáticas de BINs")
             
             # 5. Generar base limpia
             resultados["base_limpia"] = df_to_excel_bytes(df, "base_limpia")
@@ -207,6 +228,21 @@ if archivo is not None:
                 "Excluidos por vigencia": excluidos_vigencia,
                 "Total exclusiones": len(cedulas_excluir)
             }
+            
+            # Mostrar estadísticas de BINs
+            if "BIN" in df.columns:
+                bins_unicos = df["BIN"].value_counts()
+                st.subheader("📊 Estadísticas de BINs")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total de BINs únicos", len(bins_unicos))
+                with col2:
+                    bins_validos = sum(1 for bin_val in bins_unicos.index if bin_val in VALORES_BIN_PERMITIDOS)
+                    st.metric("BINs válidos", f"{bins_validos}/{len(bins_unicos)}")
+                
+                # Mostrar distribución de BINs
+                with st.expander("Ver distribución de BINs"):
+                    st.dataframe(bins_unicos.reset_index().rename(columns={"index": "BIN", "BIN": "Cantidad"}))
             
             # Mostrar resultados
             mostrar_resultados_bankard(df, config, resultados)
