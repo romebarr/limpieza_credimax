@@ -147,7 +147,7 @@ def mostrar_sidebar_info():
     st.sidebar.markdown("""
     **Versión:** 2.0.0  
     **Equipo:** SM Growth Lab  
-    **Última actualización:** 2024
+    **Última actualización:** Octubre 2025
     """)
     
     # Enlaces removidos de la interfaz - solo en documentación
