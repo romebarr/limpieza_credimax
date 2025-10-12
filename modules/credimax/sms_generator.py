@@ -139,3 +139,109 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
 
     zip_buf.seek(0)
     return zip_buf.read(), archivos_generados
+
+
+def generar_plantilla_sms_credimax_consolidada(df, sms_texto, sms_link, col_campana="Campaña Growth"):
+    """
+    Genera UNA SOLA plantilla SMS consolidada para todos los segmentos seleccionados.
+    
+    Esta función:
+    1. Acorta el enlace usando Bitly
+    2. Filtra registros con IND_DESEMBOLSO = "0" y celulares válidos
+    3. Combina TODOS los registros en un solo archivo
+    4. Reemplaza variables en el texto SMS: <#monto#>, <#tasa#>, <#link#>
+    5. Exporta un solo archivo sin encabezados
+    
+    Args:
+        df: DataFrame con datos de Credimax (ya filtrado por segmentos seleccionados)
+        sms_texto: Texto del SMS con variables personalizables
+        sms_link: Enlace original a acortar
+        col_campana: Nombre de la columna de campaña
+        
+    Returns:
+        bytes: Archivo Excel con plantilla SMS consolidada o None si no hay datos
+    """
+    if not sms_texto or not sms_link:
+        return None
+    
+    # Acortar el enlace usando Bitly
+    enlace_acortado = acortar_enlace_bitly(sms_link)
+    
+    # Columnas necesarias
+    columnas_necesarias = {
+        col_campana,
+        "IND_DESEMBOLSO",
+        "CELULAR",
+        "CUPO",  # Columna original del monto
+        "Tasa",  # Columna original de la tasa
+    }
+
+    df_trabajo = df.copy()
+    for col in columnas_necesarias:
+        if col not in df_trabajo.columns:
+            df_trabajo[col] = np.nan
+
+    # Filtrar registros válidos
+    df_exp = df_trabajo[df_trabajo["IND_DESEMBOLSO"] == "0"].copy()
+    df_exp[col_campana] = df_exp[col_campana].astype(str).str.strip()
+    
+    # Filtrar campañas válidas
+    mask_no_vacio = (
+        df_exp[col_campana].notna()
+        & (df_exp[col_campana] != "")
+        & (~df_exp[col_campana].str.lower().eq("nan"))
+    )
+    df_exp = df_exp[mask_no_vacio].copy()
+    
+    # Filtrar celulares válidos
+    df_exp = df_exp[df_exp["CELULAR"].notna() & (df_exp["CELULAR"] != "")].copy()
+
+    if df_exp.empty:
+        return None
+
+    # Generar mensajes para TODOS los registros (sin agrupar por campaña)
+    celulares = []
+    mensajes = []
+
+    for _, row in df_exp.iterrows():
+        celular = str(row.get("CELULAR", "")).strip()
+        if not celular or celular == "nan":
+            continue
+
+        # Obtener valores originales
+        monto = str(row.get("CUPO", "")).strip()
+        tasa = str(row.get("Tasa", "")).strip()
+        
+        # Mantener formato con comas para separadores de miles
+        if monto and monto != "nan":
+            monto_limpio = monto  # Mantener el formato original con comas
+        else:
+            monto_limpio = "0"
+        
+        # Limpiar tasa (remover % si existe)
+        if tasa and tasa != "nan":
+            tasa_limpia = tasa.replace("%", "").strip()
+        else:
+            tasa_limpia = "0"
+
+        # Crear mensaje personalizado
+        mensaje = sms_texto
+        mensaje = mensaje.replace("<#monto#>", monto_limpio)
+        mensaje = mensaje.replace("<#tasa#>", tasa_limpia)
+        mensaje = mensaje.replace("<#link#>", enlace_acortado)
+
+        celulares.append(celular)
+        mensajes.append(mensaje)
+
+    if not celulares:
+        return None
+
+    # Crear DataFrame consolidado
+    df_consolidado = pd.DataFrame({
+        "celular": celulares,
+        "mensaje": mensajes
+    })
+    
+    # Generar archivo Excel sin encabezados
+    excel_bytes = df_to_excel_bytes(df_consolidado, sheet_name="sms", header=False)
+    return excel_bytes

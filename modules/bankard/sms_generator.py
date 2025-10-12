@@ -128,3 +128,98 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
     
     zip_buf.seek(0)
     return zip_buf.read(), archivos_generados
+
+
+def generar_plantilla_sms_bankard_consolidada(df, sms_texto, sms_link, col_tipo="TIPO ", col_exclusion="exclusion"):
+    """
+    Genera UNA SOLA plantilla SMS consolidada para todos los segmentos seleccionados.
+    
+    Esta función:
+    1. Acorta el enlace usando Bitly
+    2. Filtra registros con exclusion = "NO" y teléfonos válidos
+    3. Combina TODOS los registros en un solo archivo
+    4. Reemplaza variables en el texto SMS: <#marca#>, <#cupo#>, <#link#>
+    5. Formatea cupos con separadores de miles
+    6. Exporta un solo archivo sin encabezados
+    
+    Args:
+        df: DataFrame con datos de Bankard (ya filtrado por segmentos seleccionados)
+        sms_texto: Texto del SMS con variables personalizables
+        sms_link: Enlace original a acortar
+        col_tipo: Nombre de la columna de tipo
+        col_exclusion: Nombre de la columna de exclusión
+        
+    Returns:
+        bytes: Archivo Excel con plantilla SMS consolidada o None si no hay datos
+    """
+    if not sms_texto or not sms_link:
+        return None
+    
+    # Acortar el enlace usando Bitly
+    enlace_acortado = acortar_enlace_bitly(sms_link)
+    
+    # Asegurar que existen las columnas necesarias
+    if col_tipo not in df.columns:
+        df[col_tipo] = "SIN_TIPO"
+    if col_exclusion not in df.columns:
+        df[col_exclusion] = "NO"
+    
+    # Filtrar registros sin exclusión
+    df_filtrado = df[df[col_exclusion] == "NO"].copy()
+    
+    # Filtrar teléfonos válidos
+    df_filtrado = df_filtrado[df_filtrado["telefono"].notna() & (df_filtrado["telefono"] != "")].copy()
+    
+    if df_filtrado.empty:
+        return None
+    
+    # Asegurar que existen las columnas BIN y cupo
+    if "BIN" not in df_filtrado.columns:
+        df_filtrado["BIN"] = ""
+    if "cupo" not in df_filtrado.columns:
+        df_filtrado["cupo"] = ""
+    
+    # Generar mensajes para TODOS los registros (sin agrupar por tipo)
+    telefonos = []
+    mensajes = []
+    
+    for _, row in df_filtrado.iterrows():
+        telefono = str(row.get("telefono", "")).strip()
+        if not telefono or telefono == "nan":
+            continue
+        
+        # Obtener valores originales
+        marca = str(row.get("BIN", "")).strip()
+        cupo = str(row.get("cupo", "")).strip()
+        
+        # Formatear cupo con separadores de miles
+        if cupo and cupo != "nan":
+            try:
+                cupo_num = int(float(cupo))
+                cupo_limpio = f"{cupo_num:,}"
+            except (ValueError, TypeError):
+                cupo_limpio = "0"
+        else:
+            cupo_limpio = "0"
+        
+        # Crear mensaje personalizado
+        mensaje = sms_texto
+        mensaje = mensaje.replace("<#marca#>", marca)
+        mensaje = mensaje.replace("<#cupo#>", cupo_limpio)
+        mensaje = mensaje.replace("<#link#>", enlace_acortado)
+        
+        telefonos.append(telefono)
+        mensajes.append(mensaje)
+    
+    if not telefonos:
+        return None
+    
+    # Crear DataFrame consolidado
+    df_consolidado = pd.DataFrame({
+        "telefono": telefonos,
+        "mensaje": mensajes
+    })
+    
+    # Generar archivo Excel sin encabezados
+    excel_bytes = df_to_excel_bytes(df_consolidado, sheet_name="sms", header=False)
+    return excel_bytes
