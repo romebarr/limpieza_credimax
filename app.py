@@ -885,9 +885,14 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
                 marca = str(row.get("BIN", "")).strip()
                 cupo = str(row.get("cupo", "")).strip()
                 
-                # Mantener formato con comas para separadores de miles
+                # Formatear cupo con separadores de miles
                 if cupo and cupo != "nan":
-                    cupo_limpio = cupo  # Mantener el formato original con comas
+                    try:
+                        # Convertir a entero y luego formatear con comas
+                        cupo_num = int(float(cupo))
+                        cupo_limpio = f"{cupo_num:,}"
+                    except (ValueError, TypeError):
+                        cupo_limpio = "0"
                 else:
                     cupo_limpio = "0"
                 
