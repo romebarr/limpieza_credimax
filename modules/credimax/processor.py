@@ -62,9 +62,9 @@ def preparar_zip_por_campana(df: pd.DataFrame, col_campana: str = "Campaña Grow
     if df_exp.empty:
         return None, []
 
-    # Mapeo columnas de salida (primer_nombre => nombre)
+    # Mapeo columnas de salida (primer_nombre => primer_nombre_credimax)
     mapeo_columnas = {
-        "primer_nombre": "nombre",             # <- solicitado
+        "primer_nombre": "primer_nombre_credimax",  # <- corregido
         "CORREO CLIENTE": "correo",
         "CUPO": "monto_credito_aprob",
         "CUOTA": "cuota_credimax",
