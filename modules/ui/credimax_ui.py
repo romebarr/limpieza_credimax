@@ -25,13 +25,11 @@ def mostrar_sidebar_credimax():
     """
     crear_sidebar_configuracion("Configuración Credimax")
     
-    # Configuración automática de segmentación
-    st.sidebar.subheader("1) Segmentación")
-    st.sidebar.info("ℹ️ Las campañas se asignan automáticamente según reglas de negocio")
+    # Configuración automática de segmentación (sin mostrar en UI)
     col_campana = "Campaña Growth"  # Columna fija
     
     # Configuración de exportación
-    st.sidebar.subheader("2) Exportación")
+    st.sidebar.subheader("1) Exportación")
     exportar_zip = st.sidebar.checkbox(
         "Generar ZIP segmentado", 
         value=True,
@@ -39,7 +37,7 @@ def mostrar_sidebar_credimax():
     )
     
     # Configuración de SMS
-    sms_texto, sms_link = mostrar_configuracion_sms("3) Plantillas SMS")
+    sms_texto, sms_link = mostrar_configuracion_sms("2) Plantillas SMS")
     
     return {
         "col_campana": col_campana,

@@ -31,6 +31,29 @@ def asignar_campanas_automaticamente(df):
     else:
         df["Campaña Growth Original"] = ""
     
+    # Verificar que existen las columnas necesarias
+    columnas_requeridas = ["CANAL", "PRODUCTO", "SEGMENTO", "TESTEO_CUOTAS"]
+    columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
+    
+    if columnas_faltantes:
+        st.warning(f"⚠️ Columnas faltantes para asignación automática: {', '.join(columnas_faltantes)}")
+        st.info("ℹ️ Se mantendrán los valores existentes de 'Campaña Growth' o se asignará valor vacío")
+        
+        # Si no hay columna Campaña Growth, crear una vacía
+        if "Campaña Growth" not in df.columns:
+            df["Campaña Growth"] = ""
+        
+        # Retornar estadísticas vacías
+        estadisticas = {
+            "No Clientes Afluente": 0,
+            "No Clientes Masivo": 0,
+            "Elite": 0,
+            "Premium": 0,
+            "Masivo Cuotas": 0,
+            "Masivo Sin Cuotas": 0,
+        }
+        return df, estadisticas
+    
     # Preparar columnas necesarias
     canal_n = df["CANAL"].fillna("").astype(str).str.strip().str.upper()
     prod_n = df["PRODUCTO"].fillna("").astype(str).str.strip().str.upper()
