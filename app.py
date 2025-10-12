@@ -107,24 +107,63 @@ if archivo is not None:
                 resultados["comparativo"] = df_to_excel_bytes(df_comp, "comparacion")
             
             # 5. Generar ZIP segmentado
+            segmentos_disponibles = []
             if config["exportar_zip"]:
                 zip_bytes, archivos = preparar_zip_por_campana(df, config["col_campana"])
                 if zip_bytes:
                     resultados["zip_bytes"] = zip_bytes
                     resultados["zip_info"] = {"archivos": archivos}
+                    # Extraer nombres de segmentos de los archivos
+                    segmentos_disponibles = [
+                        archivo.replace("Credimax_", "").replace(f"_{datetime.now().strftime('%Y%m%d')}.xlsx", "")
+                        for archivo in archivos
+                    ]
             
-            # 6. Generar plantillas SMS
-            if config["sms_texto"] and config["sms_link"]:
-                sms_bytes, archivos_sms = generar_plantilla_sms_credimax_segmentada(
-                    df, config["sms_texto"], config["sms_link"], config["col_campana"]
-                )
-                if sms_bytes:
-                    resultados["sms_bytes"] = sms_bytes
-                    resultados["sms_info"] = {"archivos": archivos_sms}
-            
-            # Mostrar resultados
+            # Mostrar resultados y descargas primero
             mostrar_resultados_credimax(df, config, resultados)
             mostrar_downloads_credimax(resultados, config)
+            
+            # 6. Selector de segmentos para plantillas SMS
+            if config["sms_texto"] and config["sms_link"] and segmentos_disponibles:
+                st.divider()
+                st.subheader("📱 Generación de Plantillas SMS")
+                st.info("Selecciona los segmentos que deseas incluir en las plantillas SMS")
+                
+                # Multiselect para elegir segmentos
+                segmentos_seleccionados = st.multiselect(
+                    "Segmentos para SMS:",
+                    options=segmentos_disponibles,
+                    default=segmentos_disponibles,  # Por defecto todos seleccionados
+                    help="Selecciona uno o más segmentos para generar plantillas SMS"
+                )
+                
+                # Botón para generar SMS
+                if segmentos_seleccionados and st.button("🚀 Generar Plantillas SMS", type="primary"):
+                    with st.spinner("Generando plantillas SMS..."):
+                        # Filtrar DataFrame por segmentos seleccionados
+                        df_filtrado = df[df[config["col_campana"]].isin(segmentos_seleccionados)].copy()
+                        
+                        sms_bytes, archivos_sms = generar_plantilla_sms_credimax_segmentada(
+                            df_filtrado, config["sms_texto"], config["sms_link"], config["col_campana"]
+                        )
+                        
+                        if sms_bytes and archivos_sms:
+                            st.success(f"✅ Se generaron {len(archivos_sms)} plantillas SMS")
+                            
+                            # Mostrar archivos generados
+                            with st.expander("📋 Archivos SMS generados"):
+                                for archivo in archivos_sms:
+                                    st.write(f"• {archivo}")
+                            
+                            # Botón de descarga
+                            st.download_button(
+                                "⬇️ Descargar Plantillas SMS (ZIP)",
+                                data=sms_bytes,
+                                file_name=f"Plantillas_SMS_Credimax_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+                                mime="application/zip"
+                            )
+                        else:
+                            st.warning("⚠️ No se pudieron generar plantillas SMS para los segmentos seleccionados")
             
         elif flujo == "bankard":
             # =============================
@@ -217,6 +256,7 @@ if archivo is not None:
             resultados["base_limpia"] = df_to_excel_bytes(df, "base_limpia")
             
             # 6. Generar ZIP segmentado
+            segmentos_disponibles_bk = []
             if config["exportar_zip"]:
                 zip_bytes, archivos = preparar_zip_bankard(
                     df, config["col_tipo"], config["col_exclusion"]
@@ -224,16 +264,11 @@ if archivo is not None:
                 if zip_bytes:
                     resultados["zip_bytes"] = zip_bytes
                     resultados["zip_info"] = {"archivos": archivos}
-            
-            # 7. Generar plantillas SMS
-            if config["sms_texto"] and config["sms_link"]:
-                sms_bytes, archivos_sms = generar_plantilla_sms_bankard_segmentada(
-                    df, config["sms_texto"], config["sms_link"], 
-                    config["col_tipo"], config["col_exclusion"]
-                )
-                if sms_bytes:
-                    resultados["sms_bytes"] = sms_bytes
-                    resultados["sms_info"] = {"archivos": archivos_sms}
+                    # Extraer nombres de segmentos de los archivos
+                    segmentos_disponibles_bk = [
+                        archivo.replace("Bankard_", "").replace(f"_{datetime.now().strftime('%Y%m%d')}.xlsx", "")
+                        for archivo in archivos
+                    ]
             
             # Agregar información adicional
             resultados["exclusiones"] = exclusiones_info
@@ -294,6 +329,51 @@ if archivo is not None:
             # Mostrar resultados
             mostrar_resultados_bankard(df, config, resultados)
             mostrar_downloads_bankard(resultados, config)
+            
+            # 7. Selector de segmentos para plantillas SMS
+            if config["sms_texto"] and config["sms_link"] and segmentos_disponibles_bk:
+                st.divider()
+                st.subheader("📱 Generación de Plantillas SMS")
+                st.info("Selecciona los segmentos que deseas incluir en las plantillas SMS")
+                
+                # Multiselect para elegir segmentos
+                segmentos_seleccionados_bk = st.multiselect(
+                    "Segmentos para SMS:",
+                    options=segmentos_disponibles_bk,
+                    default=segmentos_disponibles_bk,  # Por defecto todos seleccionados
+                    help="Selecciona uno o más segmentos para generar plantillas SMS",
+                    key="bankard_sms_selector"
+                )
+                
+                # Botón para generar SMS
+                if segmentos_seleccionados_bk and st.button("🚀 Generar Plantillas SMS", type="primary", key="bankard_sms_btn"):
+                    with st.spinner("Generando plantillas SMS..."):
+                        # Filtrar DataFrame por segmentos seleccionados
+                        df_filtrado = df[df[config["col_tipo"]].isin(segmentos_seleccionados_bk)].copy()
+                        
+                        sms_bytes, archivos_sms = generar_plantilla_sms_bankard_segmentada(
+                            df_filtrado, config["sms_texto"], config["sms_link"], 
+                            config["col_tipo"], config["col_exclusion"]
+                        )
+                        
+                        if sms_bytes and archivos_sms:
+                            st.success(f"✅ Se generaron {len(archivos_sms)} plantillas SMS")
+                            
+                            # Mostrar archivos generados
+                            with st.expander("📋 Archivos SMS generados"):
+                                for archivo in archivos_sms:
+                                    st.write(f"• {archivo}")
+                            
+                            # Botón de descarga
+                            st.download_button(
+                                "⬇️ Descargar Plantillas SMS (ZIP)",
+                                data=sms_bytes,
+                                file_name=f"Plantillas_SMS_Bankard_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+                                mime="application/zip",
+                                key="bankard_sms_download"
+                            )
+                        else:
+                            st.warning("⚠️ No se pudieron generar plantillas SMS para los segmentos seleccionados")
             
     except Exception as e:
         st.error(f"❌ Error al procesar el archivo: {str(e)}")
