@@ -205,10 +205,10 @@ def acortar_enlace_bitly(url_larga):
         return url_larga
 
 
-def df_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "base") -> bytes:
+def df_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "base", header: bool = True) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name=sheet_name)
+        df.to_excel(writer, index=False, sheet_name=sheet_name, header=header)
     buf.seek(0)
     return buf.read()
 
@@ -867,8 +867,8 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
                 "mensaje": mensajes
             })
             
-            # Agregar al ZIP
-            excel_bytes = df_to_excel_bytes(df_campana, sheet_name="sms")
+            # Agregar al ZIP (sin encabezados)
+            excel_bytes = df_to_excel_bytes(df_campana, sheet_name="sms", header=False)
             nombre_archivo_sms = f"SMS_{nombre_archivo}_{fecha_archivo}.xlsx"
             zf.writestr(nombre_archivo_sms, excel_bytes)
             archivos_generados.append(nombre_archivo_sms)
@@ -955,8 +955,8 @@ def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="
                 "mensaje": mensajes
             })
             
-            # Agregar al ZIP
-            excel_bytes = df_to_excel_bytes(df_tipo, sheet_name="sms")
+            # Agregar al ZIP (sin encabezados)
+            excel_bytes = df_to_excel_bytes(df_tipo, sheet_name="sms", header=False)
             nombre_tipo = safe_filename(tipo) or "SIN_TIPO"
             nombre_archivo_sms = f"SMS_Bankard_{nombre_tipo}_{hoy_str}.xlsx"
             zf.writestr(nombre_archivo_sms, excel_bytes)
