@@ -7,6 +7,7 @@ Esta versión utiliza todos los módulos creados para una mejor organización y 
 # =============================
 # IMPORTS PRINCIPALES
 # =============================
+import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
