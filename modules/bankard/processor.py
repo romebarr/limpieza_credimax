@@ -34,7 +34,7 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
     """
     # Asegurar que existen las columnas necesarias
     if col_tipo not in df.columns:
-        df[col_tipo] = "SIN_TIPO"
+        df[col_tipo] = "No Clientes"  # Si no hay columna TIPO, es archivo de No Clientes
     if col_exclusion not in df.columns:
         df[col_exclusion] = "NO"
 
@@ -104,8 +104,11 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
                 continue
 
             # Limpiar nombre de archivo
-            nombre_tipo = safe_filename(tipo) or "SIN_TIPO"
-            nombre_archivo_excel = f"Bankard_{nombre_tipo}_{hoy_str}.xlsx"
+            if tipo == "No Clientes":
+                nombre_archivo_excel = f"Bankard_No_Clientes_{hoy_str}.xlsx"
+            else:
+                nombre_tipo = safe_filename(tipo) or "SIN_TIPO"
+                nombre_archivo_excel = f"Bankard_{nombre_tipo}_{hoy_str}.xlsx"
 
             # Excluir la columna de tipo del archivo Excel final
             columnas_exportar = [col for col in grupo.columns if col != col_tipo]
