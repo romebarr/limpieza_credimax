@@ -41,7 +41,7 @@ from modules.bankard.exclusions import (
 from modules.bankard.bin_corrector import (
     cargar_memoria_correcciones, cargar_estadisticas_bin,
     detectar_bins_no_permitidos_inteligente, aplicar_correcciones_bin,
-    VALORES_BIN_PERMITIDOS
+    mostrar_sugerencias_interactivas_bin, VALORES_BIN_PERMITIDOS
 )
 from modules.bankard.sms_generator import generar_plantilla_sms_bankard_segmentada
 from modules.bankard.column_detector import detectar_columnas_bankard
@@ -170,31 +170,35 @@ if archivo is not None:
             # 3. Marcar exclusiones
             df = marcar_exclusiones_varios(df, cedulas_excluir)
             
-            # 4. Corregir BINs
+            # 4. Detectar y corregir BINs interactivamente
             bins_problematicos, sugerencias = detectar_bins_no_permitidos_inteligente(
                 df, memoria_correcciones, estadisticas_bin
             )
             
-            # Mostrar información sobre BINs problemáticos
+            # Mostrar interfaz interactiva para corrección de BINs
+            correcciones_confirmadas = {}
             if bins_problematicos:
                 st.warning(f"⚠️ Se encontraron {len(bins_problematicos)} BINs no permitidos")
-                with st.expander("Ver BINs problemáticos y sugerencias"):
-                    for bin_problema in bins_problematicos:
-                        st.write(f"**BIN problemático:** `{bin_problema}`")
-                        if bin_problema in sugerencias:
-                            st.write(f"**Sugerencias:** {', '.join(sugerencias[bin_problema])}")
-                        st.write("---")
+                correcciones_confirmadas = mostrar_sugerencias_interactivas_bin(
+                    bins_problematicos, sugerencias, memoria_correcciones
+                )
+            else:
+                st.success("✅ No se encontraron BINs problemáticos")
             
-            # Aplicar correcciones y contar cambios
+            # Aplicar correcciones confirmadas
             df_antes = df.copy()
-            df = aplicar_correcciones_bin(df, memoria_correcciones, estadisticas_bin)
+            df = aplicar_correcciones_bin(
+                df, memoria_correcciones, estadisticas_bin, correcciones_confirmadas
+            )
             
             # Contar correcciones aplicadas
             cambios_bin = 0
             if "BIN" in df.columns and "BIN" in df_antes.columns:
                 cambios_bin = (df["BIN"] != df_antes["BIN"]).sum()
                 if cambios_bin > 0:
-                    st.success(f"✅ Se aplicaron {cambios_bin} correcciones automáticas de BINs")
+                    st.success(f"✅ Se aplicaron {cambios_bin} correcciones de BINs confirmadas")
+                else:
+                    st.info("ℹ️ No se realizaron cambios en los BINs")
             
             # 5. Generar base limpia
             resultados["base_limpia"] = df_to_excel_bytes(df, "base_limpia")

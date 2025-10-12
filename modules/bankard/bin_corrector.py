@@ -220,14 +220,87 @@ def detectar_bins_no_permitidos_inteligente(df, memoria_correcciones, estadistic
     return bins_problematicos, sugerencias_automaticas
 
 
-def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None):
+def mostrar_sugerencias_interactivas_bin(bins_problematicos, sugerencias_automaticas, memoria_correcciones):
     """
-    Aplica correcciones de BINs basadas en memoria y estadísticas.
+    Muestra sugerencias interactivas para BINs problemáticos y permite al usuario confirmar.
+    
+    Args:
+        bins_problematicos: Lista de BINs problemáticos
+        sugerencias_automaticas: Diccionario con sugerencias para cada BIN
+        memoria_correcciones: Diccionario con correcciones previas (para actualizar)
+        
+    Returns:
+        dict: Diccionario con correcciones confirmadas por el usuario
+    """
+    import streamlit as st
+    
+    correcciones_confirmadas = {}
+    
+    if not bins_problematicos:
+        return correcciones_confirmadas
+    
+    st.subheader("🔧 Corrección Interactiva de BINs")
+    st.info("Se encontraron BINs problemáticos. Por favor, confirma las correcciones sugeridas:")
+    
+    for i, bin_problema in enumerate(bins_problematicos):
+        st.markdown(f"---")
+        st.write(f"**BIN problemático #{i+1}:** `{bin_problema}`")
+        
+        # Obtener sugerencias para este BIN
+        sugerencias = sugerencias_automaticas.get(bin_problema, [])
+        
+        if sugerencias:
+            # Mostrar sugerencias como radio buttons
+            opciones = ["Mantener original"] + sugerencias
+            seleccion = st.radio(
+                f"Selecciona la corrección para `{bin_problema}`:",
+                options=opciones,
+                key=f"bin_correccion_{i}",
+                help="Selecciona la opción más apropiada para este BIN"
+            )
+            
+            # Si no es "Mantener original", guardar la corrección
+            if seleccion != "Mantener original":
+                correcciones_confirmadas[bin_problema] = seleccion
+                st.success(f"✅ `{bin_problema}` → `{seleccion}`")
+            else:
+                st.warning(f"⚠️ Se mantendrá el valor original: `{bin_problema}`")
+        else:
+            st.warning(f"⚠️ No se encontraron sugerencias para `{bin_problema}`")
+            # Opción manual
+            correccion_manual = st.text_input(
+                f"Corrección manual para `{bin_problema}`:",
+                key=f"bin_manual_{i}",
+                placeholder="Ingresa la corrección manual"
+            )
+            if correccion_manual.strip():
+                correcciones_confirmadas[bin_problema] = correccion_manual.strip()
+                st.success(f"✅ `{bin_problema}` → `{correccion_manual}`")
+    
+    # Botón para guardar correcciones en memoria
+    if correcciones_confirmadas:
+        st.markdown("---")
+        if st.button("💾 Guardar correcciones en memoria", help="Las correcciones se recordarán para futuros procesamientos"):
+            # Actualizar memoria de correcciones
+            for bin_original, correccion in correcciones_confirmadas.items():
+                memoria_correcciones[bin_original] = correccion
+            
+            # Guardar en archivo
+            guardar_memoria_correcciones(memoria_correcciones)
+            st.success(f"✅ Se guardaron {len(correcciones_confirmadas)} correcciones en memoria")
+    
+    return correcciones_confirmadas
+
+
+def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None, correcciones_confirmadas=None):
+    """
+    Aplica correcciones de BINs basadas en memoria, estadísticas y correcciones confirmadas.
     
     Args:
         df: DataFrame con datos de Bankard
-        memoria_correcciones: Diccionario de correcciones previas
+        memoria_correcciones: Diccionario con correcciones previas
         estadisticas: Diccionario de estadísticas de uso (opcional)
+        correcciones_confirmadas: Diccionario con correcciones confirmadas por el usuario
         
     Returns:
         DataFrame: DataFrame con BINs corregidos
@@ -240,7 +313,15 @@ def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None):
             return valor
         val = str(valor).strip()
         
-        # Si ya está en memoria de correcciones, usarlo
+        # Prioridad 1: Correcciones confirmadas por el usuario
+        if correcciones_confirmadas and val in correcciones_confirmadas:
+            correccion = correcciones_confirmadas[val]
+            # Actualizar estadísticas si están disponibles
+            if estadisticas is not None:
+                actualizar_estadisticas_bin(val, correccion, estadisticas)
+            return correccion
+        
+        # Prioridad 2: Memoria de correcciones
         if val in memoria_correcciones and memoria_correcciones[val]:
             correccion = memoria_correcciones[val]
             # Actualizar estadísticas si están disponibles
@@ -248,25 +329,12 @@ def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None):
                 actualizar_estadisticas_bin(val, correccion, estadisticas)
             return correccion
         
-        # Si ya es válido, mantenerlo
+        # Prioridad 3: BINs válidos
         if val in VALORES_BIN_PERMITIDOS:
             return val
         
-        # Si no es válido, intentar sugerencias automáticas
-        if estadisticas is not None:
-            sugerencias = generar_sugerencias_inteligentes(val, memoria_correcciones, estadisticas)
-            if sugerencias:
-                # Usar la primera sugerencia automáticamente si tiene confianza moderada
-                primera_sugerencia = sugerencias[0]
-                similitud = calcular_similitud_bin(val, primera_sugerencia)
-                # Reducir umbral a 0.6 para ser más permisivo
-                if similitud > 0.6:
-                    actualizar_estadisticas_bin(val, primera_sugerencia, estadisticas)
-                    return primera_sugerencia
-        
-        # Si no hay sugerencias buenas, intentar normalizar el texto
+        # Prioridad 4: Normalización de texto
         val_normalizado = val.title()
-        # Verificar si el valor normalizado está en los permitidos
         if val_normalizado in VALORES_BIN_PERMITIDOS:
             return val_normalizado
         
