@@ -44,26 +44,29 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
     if df_filtrado.empty:
         return None, []
 
-    # Mapeo de columnas para estandarizar nombres
-    mapeo_columnas = {
-        "primer_nombre": "nombre",
-        "Nombres": "nombre", 
-        "telefono": "telefono",
-        "cedula": "cedula",
-        "cupo": "cupo_aprobado",
-        "BIN": "marca_tarjeta",
-        col_tipo: "tipo_tarjeta"
+    # Mapeo de columnas para Bankard (incluye variantes para No Clientes)
+    mapeo_columnas_bankard = {
+        "primer_nombre": "primer_nombre_bankard",
+        "Nombres": "primer_nombre_bankard",  # Para archivos No Clientes
+        "cupo": "Cupo_Aprobado_OB_BK", 
+        "BIN": "Marca_BK_OB",
+        "correo": "correo",
+        "CORREO BANCO ": "correo",  # Para archivos No Clientes
+        "telefono": "telefono"
     }
 
     # Aplicar mapeo de columnas
-    for col_original, col_nueva in mapeo_columnas.items():
+    for col_original, col_nueva in mapeo_columnas_bankard.items():
         if col_original in df_filtrado.columns:
             df_filtrado[col_nueva] = df_filtrado[col_original]
 
-    # Seleccionar columnas finales
+    # Columnas finales que se exportarán
     columnas_finales = [
-        "nombre", "telefono", "cedula", "cupo_aprobado", 
-        "marca_tarjeta", "tipo_tarjeta"
+        "primer_nombre_bankard",
+        "Cupo_Aprobado_OB_BK",
+        "Marca_BK_OB", 
+        "correo",
+        "telefono"
     ]
     
     # Asegurar que todas las columnas existen
@@ -72,9 +75,23 @@ def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
             df_filtrado[col] = ""
 
     df_final = df_filtrado[columnas_finales].copy()
+    
+    # Formatear cupos con separadores de miles
+    if "Cupo_Aprobado_OB_BK" in df_final.columns:
+        def formatear_cupo(valor):
+            if pd.isna(valor) or valor == "" or valor == "nan":
+                return "0"
+            try:
+                # Convertir a número y formatear con comas
+                cupo_num = int(float(str(valor)))
+                return f"{cupo_num:,}"
+            except (ValueError, TypeError):
+                return "0"
+        
+        df_final["Cupo_Aprobado_OB_BK"] = df_final["Cupo_Aprobado_OB_BK"].apply(formatear_cupo)
 
-    # Agrupar por tipo de tarjeta
-    grupos = df_final.groupby("tipo_tarjeta")
+    # Agrupar por tipo de tarjeta (usar la columna original)
+    grupos = df_final.groupby(col_tipo)
 
     zip_buf = io.BytesIO()
     archivos_generados = []
