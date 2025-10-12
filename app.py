@@ -90,9 +90,19 @@ BITLY_DOMAIN = "mkt-bb.com"
 BITLY_API_URL = "https://api-ssl.bitly.com/v4/shorten"
 
 # =============================
-# Funciones comunes
+# FUNCIONES COMUNES DE VALIDACIÓN Y LIMPIEZA
 # =============================
+
 def validar_cedula_10(cedula):
+    """
+    Valida que una cédula ecuatoriana tenga exactamente 10 dígitos.
+    
+    Args:
+        cedula: Valor a validar (puede ser string, int, float, etc.)
+        
+    Returns:
+        bool: True si la cédula tiene 10 dígitos, False en caso contrario
+    """
     if pd.isna(cedula):
         return False
     dig = re.sub(r"\D+", "", str(cedula))
@@ -100,7 +110,20 @@ def validar_cedula_10(cedula):
 
 
 def normalizar_celular_ec(valor):
-    """Extrae dígitos; si 10 -> ok; si 9 y primero != '0' -> anteponer '0'; caso contrario -> NaN."""
+    """
+    Normaliza números de celular ecuatorianos a formato estándar de 10 dígitos.
+    
+    Reglas:
+    - Si tiene 10 dígitos: se mantiene
+    - Si tiene 9 dígitos y no empieza con '0': se antepone '0'
+    - Cualquier otro caso: se retorna NaN
+    
+    Args:
+        valor: Número de celular a normalizar
+        
+    Returns:
+        str: Celular normalizado de 10 dígitos o np.nan si no es válido
+    """
     if pd.isna(valor):
         return np.nan
     dig = re.sub(r"\D+", "", str(valor))
@@ -112,6 +135,15 @@ def normalizar_celular_ec(valor):
 
 
 def a_nombre_propio(s):
+    """
+    Convierte texto a formato de nombres propios (Primera Letra Mayúscula).
+    
+    Args:
+        s: Texto a convertir
+        
+    Returns:
+        str: Texto en formato de nombres propios o valor original si es NaN
+    """
     if pd.isna(s):
         return s
     limpio = " ".join(str(s).strip().split())
@@ -119,7 +151,20 @@ def a_nombre_propio(s):
 
 
 def cupo_a_texto_miles_coma(valor):
-    """Convierte a texto con coma como separador de miles. 1000 -> '1,000'; '1.000' -> '1,000'."""
+    """
+    Convierte un valor numérico a texto con comas como separadores de miles.
+    
+    Ejemplos:
+    - 1000 -> '1,000'
+    - '1.000' -> '1,000'
+    - 'abc' -> NaN
+    
+    Args:
+        valor: Valor a convertir (puede ser string, int, float)
+        
+    Returns:
+        str: Valor formateado con comas o np.nan si no es válido
+    """
     if pd.isna(valor):
         return np.nan
     s = str(valor).strip()
@@ -133,10 +178,28 @@ def cupo_a_texto_miles_coma(valor):
 
 
 def strip_accents(s: str) -> str:
+    """
+    Remueve acentos y caracteres especiales de un texto.
+    
+    Args:
+        s: Texto a procesar
+        
+    Returns:
+        str: Texto sin acentos
+    """
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
 
 
 def norm(v: str) -> str:
+    """
+    Normaliza texto para comparaciones: remueve acentos, espacios extra y convierte a mayúsculas.
+    
+    Args:
+        v: Texto a normalizar
+        
+    Returns:
+        str: Texto normalizado en mayúsculas sin acentos
+    """
     if pd.isna(v):
         return ""
     s = str(v).strip()
@@ -146,6 +209,15 @@ def norm(v: str) -> str:
 
 
 def formatear_cuota(valor):
+    """
+    Formatea un valor como cuota con 2 decimales.
+    
+    Args:
+        valor: Valor a formatear
+        
+    Returns:
+        str: Valor formateado con 2 decimales o np.nan si no es válido
+    """
     if pd.isna(valor):
         return np.nan
     s = str(valor).strip().replace(",", ".")
@@ -158,6 +230,15 @@ def formatear_cuota(valor):
 
 
 def safe_filename(s: str) -> str:
+    """
+    Convierte un texto en un nombre de archivo seguro removiendo caracteres especiales.
+    
+    Args:
+        s: Texto a convertir
+        
+    Returns:
+        str: Nombre de archivo seguro
+    """
     return (
         str(s)
         .replace("/", "_")
@@ -174,7 +255,21 @@ def safe_filename(s: str) -> str:
 
 
 def acortar_enlace_bitly(url_larga):
-    """Acorta un enlace usando Bitly API"""
+    """
+    Acorta un enlace usando la API de Bitly con dominio personalizado.
+    
+    Args:
+        url_larga: URL original a acortar
+        
+    Returns:
+        str: URL acortada o URL original si falla la API
+        
+    Note:
+        - Usa el token de acceso configurado en BITLY_ACCESS_TOKEN
+        - Usa el dominio personalizado mkt-bb.com
+        - Timeout de 10 segundos para evitar bloqueos
+        - Si falla, retorna el enlace original y muestra advertencia
+    """
     if not url_larga or not url_larga.strip():
         return url_larga
     
@@ -206,6 +301,17 @@ def acortar_enlace_bitly(url_larga):
 
 
 def df_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "base", header: bool = True) -> bytes:
+    """
+    Convierte un DataFrame de pandas a bytes de archivo Excel.
+    
+    Args:
+        df: DataFrame a convertir
+        sheet_name: Nombre de la hoja en el Excel
+        header: Si incluir encabezados de columnas (True) o no (False)
+        
+    Returns:
+        bytes: Contenido del archivo Excel en bytes
+    """
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name, header=header)
@@ -214,6 +320,15 @@ def df_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "base", header: bool =
 
 
 def pad_10_digitos(valor):
+    """
+    Normaliza un valor a exactamente 10 dígitos, rellenando con ceros a la izquierda.
+    
+    Args:
+        valor: Valor a normalizar (puede ser string, int, float)
+        
+    Returns:
+        str: Valor normalizado a 10 dígitos o cadena vacía si no es válido
+    """
     if pd.isna(valor):
         return ""
     s = re.sub(r"\D", "", str(valor))
@@ -229,7 +344,22 @@ def pad_10_digitos(valor):
 # Funciones específicas Credimax
 # =============================
 def preparar_zip_por_campana(df: pd.DataFrame, col_campana: str = "Campaña Growth"):
-    """Genera el ZIP segmentado por campaña y devuelve (bytes_zip, columnas_exportadas)."""
+    """
+    Genera un archivo ZIP con archivos Excel segmentados por campaña para Credimax.
+    
+    Esta función:
+    1. Filtra registros con IND_DESEMBOLSO = "0" (sin desembolso)
+    2. Agrupa por campaña y genera un archivo Excel por cada campaña
+    3. Aplica mapeo de columnas para estandarizar nombres
+    4. Formatea valores (cupos con comas, cuotas con decimales)
+    
+    Args:
+        df: DataFrame con los datos de Credimax
+        col_campana: Nombre de la columna que contiene las campañas
+        
+    Returns:
+        tuple: (bytes_zip, columnas_exportadas) o (None, []) si no hay datos
+    """
     columnas_necesarias = {
         col_campana,
         "IND_DESEMBOLSO",
@@ -498,21 +628,40 @@ def detectar_bins_no_permitidos_inteligente(df, memoria_correcciones, estadistic
     return bins_problematicos, sugerencias_automaticas
 
 
+def extraer_solo_numeros(valor):
+    """
+    Extrae solo dígitos de un valor y los convierte a entero.
+    
+    Args:
+        valor: Valor a procesar (puede ser string, int, float)
+        
+    Returns:
+        int: Número extraído o 0 si no hay dígitos válidos
+    """
+    if pd.isna(valor):
+        return 0
+    dig = re.sub(r"[^0-9]", "", str(valor))
+    if dig == "":
+        return 0
+    return int(dig)
+
+
 def limpiar_cupo_bankard(df):
+    """
+    Limpia la columna 'cupo' en datos de Bankard, extrayendo solo números.
+    
+    Args:
+        df: DataFrame con datos de Bankard
+        
+    Returns:
+        DataFrame: DataFrame con columna 'cupo' limpia
+    """
     df = df.copy()
     if "cupo" not in df.columns:
         df["cupo"] = 0
         return df
 
-    def solo_numero(val):
-        if pd.isna(val):
-            return 0
-        dig = re.sub(r"[^0-9]", "", str(val))
-        if dig == "":
-            return 0
-        return int(dig)
-
-    df["cupo"] = df["cupo"].apply(solo_numero)
+    df["cupo"] = df["cupo"].apply(extraer_solo_numeros)
     return df
 
 
@@ -561,6 +710,18 @@ def aplicar_correcciones_bin(df, memoria_correcciones, estadisticas=None):
 
 
 def filtrar_vigencia_bankard(df):
+    """
+    Filtra registros de Bankard por vigencia, excluyendo los vencidos.
+    
+    Busca columnas de vigencia con variaciones de nombre y filtra registros
+    cuya fecha de vigencia sea mayor o igual a la fecha actual.
+    
+    Args:
+        df: DataFrame con datos de Bankard
+        
+    Returns:
+        tuple: (df_filtrado, cantidad_excluidos)
+    """
     df = df.copy()
     col_vigencia = None
     for posible in ["VIGENICA. BASE", "VIGENCIA. BASE", "VIGENCIA BASE"]:
@@ -580,6 +741,15 @@ def filtrar_vigencia_bankard(df):
 
 
 def limpiar_telefonos_cedulas_bankard(df):
+    """
+    Normaliza teléfonos y cédulas en datos de Bankard a formato de 10 dígitos.
+    
+    Args:
+        df: DataFrame con datos de Bankard
+        
+    Returns:
+        DataFrame: DataFrame con teléfonos y cédulas normalizados
+    """
     df = df.copy()
     if "telefono" not in df.columns:
         df["telefono"] = ""
@@ -591,7 +761,20 @@ def limpiar_telefonos_cedulas_bankard(df):
 
 
 def limpiar_nombres_bankard(df):
-    """Limpia y normaliza nombres en formato de nombres propios para Bankard"""
+    """
+    Limpia y normaliza nombres en formato de nombres propios para Bankard.
+    
+    Maneja diferentes variaciones de columnas de nombres:
+    - primer_nombre (archivos de clientes)
+    - Nombres (archivos No Clientes)
+    - nombre (columna alternativa)
+    
+    Args:
+        df: DataFrame con datos de Bankard
+        
+    Returns:
+        DataFrame: DataFrame con nombres normalizados
+    """
     df = df.copy()
     
     # Limpiar primer_nombre si existe (archivos de clientes)
@@ -610,6 +793,15 @@ def limpiar_nombres_bankard(df):
 
 
 def cargar_cedulas_excluir_uploads(files):
+    """
+    Carga cédulas de exclusión desde archivos subidos por el usuario.
+    
+    Args:
+        files: Lista de archivos subidos (Streamlit file uploader)
+        
+    Returns:
+        tuple: (set_cedulas, lista_errores)
+    """
     cedulas = set()
     errores = []
     for upload in files or []:
@@ -617,15 +809,13 @@ def cargar_cedulas_excluir_uploads(files):
             upload.seek(0)
         except Exception:
             pass
-        try:
-            df_exc = pd.read_excel(upload, dtype=str)
-        except Exception as exc:
-            errores.append(f"{upload.name}: {exc}")
-            continue
-        if "IDENTIFICACION" not in df_exc.columns:
-            errores.append(f"{upload.name}: no contiene columna 'IDENTIFICACION'")
-            continue
-        cedulas.update(df_exc["IDENTIFICACION"].astype(str).apply(pad_10_digitos))
+        
+        cedulas_archivo, error = procesar_archivo_excel_exclusiones(upload, upload.name)
+        if error:
+            errores.append(error)
+        else:
+            cedulas.update(cedulas_archivo)
+    
     return cedulas, errores
 
 
@@ -691,8 +881,39 @@ def procesar_archivo_exclusiones(archivo_path, cedulas_consolidadas, estadistica
     return True, f"Procesado: {cedulas_nuevas} nuevas, {cedulas_actualizadas} actualizadas"
 
 
+def procesar_archivo_excel_exclusiones(archivo_path, nombre_archivo):
+    """
+    Procesa un archivo Excel de exclusiones y extrae las cédulas.
+    
+    Args:
+        archivo_path: Ruta al archivo Excel
+        nombre_archivo: Nombre del archivo para mensajes de error
+        
+    Returns:
+        tuple: (cedulas_set, error_message) o (None, error_message) si falla
+    """
+    try:
+        df_exc = pd.read_excel(archivo_path, dtype=str)
+    except Exception as exc:
+        return None, f"{nombre_archivo}: {exc}"
+    
+    if "IDENTIFICACION" not in df_exc.columns:
+        return None, f"{nombre_archivo}: no contiene columna 'IDENTIFICACION'"
+    
+    cedulas = set(df_exc["IDENTIFICACION"].astype(str).apply(pad_10_digitos))
+    return cedulas, None
+
+
 def cargar_cedulas_excluir_directorio(path: Path):
-    """Carga exclusiones desde archivos Excel (método legacy)"""
+    """
+    Carga exclusiones desde archivos Excel en un directorio (método legacy).
+    
+    Args:
+        path: Ruta al directorio con archivos Excel
+        
+    Returns:
+        tuple: (set_cedulas, lista_errores, lista_archivos_procesados)
+    """
     cedulas = set()
     errores = []
     archivos = []
@@ -702,20 +923,13 @@ def cargar_cedulas_excluir_directorio(path: Path):
     for archivo in path.glob("*.xlsx"):
         if archivo.name.startswith("~$"):
             continue
-        try:
-            df_exc = pd.read_excel(archivo, dtype=str)
-        except Exception as exc:
-            errores.append(f"{archivo.name}: {exc}")
-            continue
-        if "IDENTIFICACION" not in df_exc.columns:
-            errores.append(
-                f"{archivo.name}: no contiene columna 'IDENTIFICACION'"
-            )
-            continue
-        cedulas.update(
-            df_exc["IDENTIFICACION"].astype(str).apply(pad_10_digitos)
-        )
-        archivos.append(archivo.name)
+        
+        cedulas_archivo, error = procesar_archivo_excel_exclusiones(archivo, archivo.name)
+        if error:
+            errores.append(error)
+        else:
+            cedulas.update(cedulas_archivo)
+            archivos.append(archivo.name)
 
     return cedulas, errores, archivos
 
@@ -780,7 +994,25 @@ def ensure_column_from(df, target, sources=(), fill_value=""):
 
 
 def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campana="Campaña Growth"):
-    """Genera plantillas SMS segmentadas por campaña para Credimax"""
+    """
+    Genera plantillas SMS segmentadas por campaña para Credimax.
+    
+    Esta función:
+    1. Acorta el enlace usando Bitly
+    2. Filtra registros con IND_DESEMBOLSO = "0" y celulares válidos
+    3. Agrupa por campaña y genera un archivo Excel por cada campaña
+    4. Reemplaza variables en el texto SMS: <#monto#>, <#tasa#>, <#link#>
+    5. Exporta archivos sin encabezados para importación directa
+    
+    Args:
+        df: DataFrame con datos de Credimax
+        sms_texto: Texto del SMS con variables personalizables
+        sms_link: Enlace original a acortar
+        col_campana: Nombre de la columna de campaña
+        
+    Returns:
+        tuple: (bytes_zip, lista_archivos_generados) o (None, []) si no hay datos
+    """
     if not sms_texto or not sms_link:
         return None, []
     
@@ -881,7 +1113,27 @@ def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campa
 
 
 def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="TIPO ", col_exclusion="exclusion"):
-    """Genera plantillas SMS segmentadas por tipo y exclusión para Bankard"""
+    """
+    Genera plantillas SMS segmentadas por tipo para Bankard.
+    
+    Esta función:
+    1. Acorta el enlace usando Bitly
+    2. Filtra registros con exclusion = "NO" y teléfonos válidos
+    3. Agrupa por tipo de tarjeta y genera un archivo Excel por cada tipo
+    4. Reemplaza variables en el texto SMS: <#marca#>, <#cupo#>, <#link#>
+    5. Formatea cupos con separadores de miles
+    6. Exporta archivos sin encabezados para importación directa
+    
+    Args:
+        df: DataFrame con datos de Bankard
+        sms_texto: Texto del SMS con variables personalizables
+        sms_link: Enlace original a acortar
+        col_tipo: Nombre de la columna de tipo
+        col_exclusion: Nombre de la columna de exclusión
+        
+    Returns:
+        tuple: (bytes_zip, lista_archivos_generados) o (None, []) si no hay datos
+    """
     if not sms_texto or not sms_link:
         return None, []
     
