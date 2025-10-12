@@ -739,6 +739,185 @@ def ensure_column_from(df, target, sources=(), fill_value=""):
     return target
 
 
+def generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link, col_campana="Campaña Growth"):
+    """Genera plantillas SMS segmentadas por campaña para Credimax"""
+    if not sms_texto or not sms_link:
+        return None, []
+    
+    # Usar la misma lógica que preparar_zip_por_campana
+    columnas_necesarias = {
+        col_campana,
+        "IND_DESEMBOLSO",
+        "CELULAR",
+        "monto_credito_aprob",
+        "Tasa_Credito_Aprob",
+    }
+
+    df_trabajo = df.copy()
+    for col in columnas_necesarias:
+        if col not in df_trabajo.columns:
+            df_trabajo[col] = np.nan
+
+    df_exp = df_trabajo[df_trabajo["IND_DESEMBOLSO"] == "0"].copy()
+    df_exp[col_campana] = df_exp[col_campana].astype(str).str.strip()
+    mask_no_vacio = (
+        df_exp[col_campana].notna()
+        & (df_exp[col_campana] != "")
+        & (~df_exp[col_campana].str.lower().eq("nan"))
+    )
+    df_exp = df_exp[mask_no_vacio].copy()
+
+    if df_exp.empty:
+        return None, []
+
+    # Filtrar solo registros con celular válido
+    df_exp = df_exp[df_exp["CELULAR"].notna() & (df_exp["CELULAR"] != "")]
+
+    if df_exp.empty:
+        return None, []
+
+    fecha_archivo = datetime.now().strftime("%d-%m")
+    zip_buf = io.BytesIO()
+    archivos_generados = []
+
+    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for nombre, grupo in df_exp.groupby(col_campana, dropna=False):
+            if pd.isna(nombre):
+                continue
+            nombre_archivo = safe_filename(nombre)
+            if not nombre_archivo or nombre_archivo.lower() == "nan":
+                continue
+
+            # Generar mensajes personalizados para este grupo
+            mensajes = []
+            celulares = []
+            
+            for _, row in grupo.iterrows():
+                mensaje = sms_texto
+                
+                # Reemplazar variables
+                monto = str(row.get("monto_credito_aprob", "")).strip()
+                tasa = str(row.get("Tasa_Credito_Aprob", "")).strip()
+                
+                # Limpiar monto (quitar comas para mostrar solo números)
+                if monto and monto != "nan":
+                    monto_limpio = monto.replace(",", "")
+                else:
+                    monto_limpio = "0"
+                
+                # Limpiar tasa (quitar % si existe)
+                if tasa and tasa != "nan":
+                    tasa_limpia = tasa.replace("%", "").strip()
+                else:
+                    tasa_limpia = "0"
+                
+                mensaje = mensaje.replace("<#monto#>", monto_limpio)
+                mensaje = mensaje.replace("<#tasa#>", tasa_limpia)
+                mensaje = mensaje.replace("<#link#>", sms_link)
+                
+                mensajes.append(mensaje)
+                celulares.append(row["CELULAR"])
+            
+            # Crear DataFrame para esta campaña
+            df_campana = pd.DataFrame({
+                "celular": celulares,
+                "mensaje": mensajes
+            })
+            
+            # Agregar al ZIP
+            excel_bytes = df_to_excel_bytes(df_campana, sheet_name="sms")
+            nombre_archivo_sms = f"SMS_{nombre_archivo}_{fecha_archivo}.xlsx"
+            zf.writestr(nombre_archivo_sms, excel_bytes)
+            archivos_generados.append(nombre_archivo_sms)
+
+    if not archivos_generados:
+        return None, []
+
+    zip_buf.seek(0)
+    return zip_buf.read(), archivos_generados
+
+
+def generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link, col_tipo="TIPO ", col_exclusion="exclusion"):
+    """Genera plantillas SMS segmentadas por tipo y exclusión para Bankard"""
+    if not sms_texto or not sms_link:
+        return None, []
+    
+    if col_tipo not in df.columns or col_exclusion not in df.columns:
+        return None, []
+
+    # Asegurar que las columnas necesarias existan
+    if "telefono" not in df.columns:
+        df["telefono"] = ""
+    if "Marca_BK_OB" not in df.columns:
+        df["Marca_BK_OB"] = ""
+    if "Cupo_Aprobado_OB_BK" not in df.columns:
+        df["Cupo_Aprobado_OB_BK"] = ""
+
+    hoy_str = datetime.now().strftime("%d%m")
+    zip_buf = io.BytesIO()
+    archivos_generados = []
+
+    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for tipo in sorted(df[col_tipo].dropna().astype(str).unique()):
+            # Solo procesar registros SIN exclusión (exclusion = "NO")
+            subset = df[
+                (df[col_tipo].astype(str) == tipo)
+                & (df[col_exclusion].astype(str).str.upper() == "NO")
+            ].copy()
+            
+            if subset.empty:
+                continue
+            
+            # Filtrar solo registros con teléfono válido
+            subset = subset[subset["telefono"].notna() & (subset["telefono"] != "")]
+            
+            if subset.empty:
+                continue
+            
+            # Generar mensajes personalizados para este grupo
+            mensajes = []
+            telefonos = []
+            
+            for _, row in subset.iterrows():
+                mensaje = sms_texto
+                
+                # Reemplazar variables
+                marca = str(row.get("Marca_BK_OB", "")).strip()
+                cupo = str(row.get("Cupo_Aprobado_OB_BK", "")).strip()
+                
+                # Limpiar cupo (quitar comas para mostrar solo números)
+                if cupo and cupo != "nan":
+                    cupo_limpio = cupo.replace(",", "")
+                else:
+                    cupo_limpio = "0"
+                
+                mensaje = mensaje.replace("<#marca#>", marca)
+                mensaje = mensaje.replace("<#cupo#>", cupo_limpio)
+                mensaje = mensaje.replace("<#link#>", sms_link)
+                
+                mensajes.append(mensaje)
+                telefonos.append(row["telefono"])
+            
+            # Crear DataFrame para este tipo
+            df_tipo = pd.DataFrame({
+                "telefono": telefonos,
+                "mensaje": mensajes
+            })
+            
+            # Agregar al ZIP
+            excel_bytes = df_to_excel_bytes(df_tipo, sheet_name="sms")
+            nombre_tipo = safe_filename(tipo) or "SIN_TIPO"
+            nombre_archivo_sms = f"SMS_Bankard_{nombre_tipo}_{hoy_str}.xlsx"
+            zf.writestr(nombre_archivo_sms, excel_bytes)
+            archivos_generados.append(nombre_archivo_sms)
+
+    if not archivos_generados:
+        return None, []
+
+    zip_buf.seek(0)
+    return zip_buf.read(), archivos_generados
+
+
 def preparar_zip_bankard(df, col_tipo="TIPO ", col_exclusion="exclusion"):
     if col_tipo not in df.columns or col_exclusion not in df.columns:
         return None, []
@@ -826,6 +1005,32 @@ def run_credimax():
     export_por_campana = st.sidebar.checkbox(
         "Generar ZIP por 'Campaña Growth'", value=True, key="zip_credimax"
     )
+    
+    st.sidebar.header("3) Plantillas SMS")
+    exportar_sms = st.sidebar.checkbox(
+        "Generar plantilla SMS", 
+        value=False, 
+        key="exportar_sms_credimax",
+        help="Genera archivo con plantilla de SMS personalizada"
+    )
+    
+    # Campos para plantilla SMS
+    sms_texto = ""
+    sms_link = ""
+    if exportar_sms:
+        st.sidebar.subheader("📱 Configuración SMS")
+        sms_texto = st.sidebar.text_area(
+            "Texto del SMS",
+            value="En Banco Bolivariano, tienes un prestamo aprobado de $<#monto#> con una tasa del <#tasa#>% por tiempo limitado. Solicitalo aqui ahora: <#link#>",
+            help="Usa <#monto#> para monto, <#tasa#> para tasa, <#link#> para enlace",
+            key="sms_texto_credimax"
+        )
+        sms_link = st.sidebar.text_input(
+            "Enlace",
+            value="https://ejemplo.com/credimax",
+            help="Enlace que reemplazará <#link#> en el SMS",
+            key="sms_link_credimax"
+        )
 
     if not base_file:
         st.info("👆 Sube la base para continuar.")
@@ -978,6 +1183,30 @@ def run_credimax():
                 "No hay registros con IND_DESEMBOLSO = '0' y campaña válida para generar el ZIP."
             )
 
+    # Generar plantilla SMS si está habilitada
+    if exportar_sms and sms_texto and sms_link:
+        zip_sms_bytes, archivos_sms = generar_plantilla_sms_credimax_segmentada(df, sms_texto, sms_link)
+        if zip_sms_bytes and archivos_sms:
+            st.divider()
+            st.subheader("📱 Plantillas SMS Segmentadas")
+            
+            # Mostrar estadísticas de archivos generados
+            st.write(f"**Se generaron {len(archivos_sms)} plantillas SMS segmentadas por campaña:**")
+            for archivo in archivos_sms:
+                st.caption(f"• {archivo}")
+            
+            # Botón de descarga
+            fecha_sms = datetime.now().strftime("%Y%m%d_%H%M")
+            st.download_button(
+                "⬇️ Descargar ZIP Plantillas SMS",
+                data=zip_sms_bytes,
+                file_name=f"SMS_Credimax_Segmentado_{fecha_sms}.zip",
+                mime="application/zip",
+            )
+            st.caption("📱 **Plantillas SMS segmentadas por campaña** (solo registros sin desembolso)")
+        else:
+            st.warning("No se pudo generar las plantillas SMS. Verifica que haya registros con IND_DESEMBOLSO = '0', campañas válidas y celulares válidos.")
+
     st.success("✅ Limpieza Credimax completada. Descarga tus archivos.")
 
 
@@ -991,6 +1220,32 @@ def run_bankard():
     
     # Cargar exclusiones consolidadas
     cedulas_consolidadas, estadisticas_exclusiones = cargar_exclusiones_consolidadas()
+    
+    st.sidebar.header("3) Plantillas SMS")
+    exportar_sms = st.sidebar.checkbox(
+        "Generar plantilla SMS", 
+        value=False, 
+        key="exportar_sms_bankard",
+        help="Genera archivo con plantilla de SMS personalizada"
+    )
+    
+    # Campos para plantilla SMS
+    sms_texto = ""
+    sms_link = ""
+    if exportar_sms:
+        st.sidebar.subheader("📱 Configuración SMS")
+        sms_texto = st.sidebar.text_area(
+            "Texto del SMS",
+            value="Felicidades! Tu Bankard <#marca#> ha sido aprobada con un cupo de $<#cupo#>. Obtenla en minutos aqui: <#link#>",
+            help="Usa <#marca#> para marca, <#cupo#> para cupo, <#link#> para enlace",
+            key="sms_texto_bankard"
+        )
+        sms_link = st.sidebar.text_input(
+            "Enlace",
+            value="https://ejemplo.com/bankard",
+            help="Enlace que reemplazará <#link#> en el SMS",
+            key="sms_link_bankard"
+        )
     
     # Mostrar estadísticas del sistema consolidado
     if estadisticas_exclusiones:
@@ -1300,6 +1555,30 @@ def run_bankard():
         st.caption("📋 **Mapeo de columnas:** primer_nombre → primer_nombre_bankard, cupo → Cupo_Aprobado_OB_BK, BIN → Marca_BK_OB")
     else:
         st.info("No hay registros para exportar por tipo y exclusión.")
+
+    # Generar plantilla SMS si está habilitada
+    if exportar_sms and sms_texto and sms_link:
+        zip_sms_bytes, archivos_sms = generar_plantilla_sms_bankard_segmentada(df, sms_texto, sms_link)
+        if zip_sms_bytes and archivos_sms:
+            st.divider()
+            st.subheader("📱 Plantillas SMS Segmentadas")
+            
+            # Mostrar estadísticas de archivos generados
+            st.write(f"**Se generaron {len(archivos_sms)} plantillas SMS segmentadas por tipo:**")
+            for archivo in archivos_sms:
+                st.caption(f"• {archivo}")
+            
+            # Botón de descarga
+            fecha_sms = datetime.now().strftime("%Y%m%d_%H%M")
+            st.download_button(
+                "⬇️ Descargar ZIP Plantillas SMS",
+                data=zip_sms_bytes,
+                file_name=f"SMS_Bankard_Segmentado_{fecha_sms}.zip",
+                mime="application/zip",
+            )
+            st.caption("📱 **Plantillas SMS segmentadas por tipo** (solo registros sin exclusión)")
+        else:
+            st.warning("No se pudo generar las plantillas SMS. Verifica que haya registros sin exclusión con teléfonos válidos.")
 
     st.success("✅ Limpieza Bankard completada. Descarga tus archivos.")
 
