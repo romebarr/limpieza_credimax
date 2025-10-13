@@ -29,7 +29,12 @@ from modules.ui.bankard_ui import (
 # Imports de procesamiento
 from modules.credimax.processor import preparar_zip_por_campana
 from modules.credimax.sms_generator import generar_plantilla_sms_credimax_segmentada, generar_plantilla_sms_credimax_consolidada
-from modules.credimax.campaign_assigner import asignar_campanas_automaticamente, mostrar_estadisticas_campanas
+from modules.credimax.campaign_assigner import (
+    asignar_campanas_automaticamente, mostrar_estadisticas_campanas,
+    cargar_memoria_reglas, detectar_casos_sin_regla, 
+    mostrar_interfaz_reglas_interactiva, aplicar_reglas_personalizadas,
+    mostrar_estado_memoria_reglas
+)
 from modules.bankard.processor import preparar_zip_bankard
 from modules.bankard.cleaner import (
     limpiar_cupo_bankard, filtrar_vigencia_bankard, 
@@ -94,7 +99,30 @@ if archivo is not None:
             df["CUPO"] = df["CUPO"].apply(cupo_a_texto_miles_coma)
             
             # 2. Asignar campañas automáticamente
+            # 2.1 Cargar memoria de reglas personalizadas
+            memoria_reglas = cargar_memoria_reglas()
+            mostrar_estado_memoria_reglas(memoria_reglas)
+            
+            # 2.2 Aplicar reglas estándar
             df, estadisticas_campanas = asignar_campanas_automaticamente(df)
+            
+            # 2.3 Aplicar reglas personalizadas desde memoria
+            df = aplicar_reglas_personalizadas(df, memoria_reglas)
+            
+            # 2.4 Detectar casos sin regla y mostrar interfaz interactiva
+            casos_sin_regla, combinaciones_sin_regla = detectar_casos_sin_regla(df)
+            
+            if combinaciones_sin_regla:
+                # Mostrar interfaz para asignar campañas a combinaciones nuevas
+                nuevas_reglas = mostrar_interfaz_reglas_interactiva(combinaciones_sin_regla, memoria_reglas)
+                
+                # Si el usuario asignó nuevas reglas, aplicarlas
+                if nuevas_reglas:
+                    df = aplicar_reglas_personalizadas(df, nuevas_reglas)
+            else:
+                st.success("✅ Todas las combinaciones tienen reglas de asignación definidas")
+            
+            # 2.5 Mostrar estadísticas finales
             mostrar_estadisticas_campanas(estadisticas_campanas)
             
             # 3. Generar base limpia
